@@ -1,0 +1,66 @@
+:root {
+  /* Brand greens (Figma: Colors/Primary) */
+  --primary-50: #e7f3ec;
+  --primary-100: #d0e7d9;
+  --primary-300: #6eb489;
+  --primary-400: #498d63;
+  --primary-500: #305d41;
+  --primary-700: #1e3928;
+  --primary-900: #0a140e;
+  --gold-100: #feefd4;
+  --gold-300: #f8cd42;
+  --gold-500: #d4af36;
+
+  /* Status colours */
+  --green-100: #dcfae6;
+  --green-500: #17b26a;
+  --green-600: #079455;
+  --yellow-100: #fef0c7;
+  --yellow-500: #f79009;
+  --yellow-600: #dc6803;
+  --red-100: #fee4e2;
+  --red-600: #d92d20;
+  --blue-100: #e0eaff;
+  --blue-500: #2970ff;
+  --purple-100: #f1e4fb;
+  --purple-500: #a855d8;
+
+  /* Greys */
+  --grey-100: #f7f7f7;
+  --grey-200: #ededed;
+  --grey-400: #d7d7d7;
+  --grey-500: #c0c0c0;
+  --grey-600: #a2a2a2;
+  --grey-700: #717171;
+  --grey-800: #494949;
+  --grey-900: #313131;
+  --grey-1000: #181818;
+  --white: #ffffff;
+
+  /* Radius */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 24px;
+  --r-full: 999px;
+
+  /* Spacing */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-12: 48px;
+
+  --font-ui: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Playfair Display', Georgia, 'Times New Roman', serif;
+
+  --sidebar-w: 230px;
+  --topbar-h: 90px;
+  --shadow-sm: 0 1px 2px rgba(10, 20, 14, 0.06);
+  --shadow-md: 0 8px 24px rgba(10, 20, 14, 0.1);
+  --shadow-lg: 0 24px 60px rgba(10, 20, 14, 0.18);
+  --focus: 0 0 0 3px rgba(48, 93, 65, 0.25);
+}

@@ -1,0 +1,92 @@
+/* Group coopc: cooperative disbursements, farming progress and settlements. Only tokens from tokens.css are used. */
+
+.coopc-stack > * + * { margin-top: var(--s-4); }
+.coopc-mono { font-variant-numeric: tabular-nums; font-size: 14px; color: var(--grey-800); white-space: nowrap; }
+.coopc-plain-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.coopc-issues { margin: 6px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.coopc-issues a { font-weight: 600; text-decoration: underline; color: inherit; }
+.coopc-section-note { font-size: 13px; color: var(--grey-700); }
+
+/* Figma detail modal: item card and bordered information table */
+.coopc-card { border: 1px solid var(--primary-100); border-radius: var(--r-lg); background: var(--white); padding: var(--s-4); }
+.coopc-person { display: flex; align-items: center; gap: var(--s-3); }
+.coopc-info__title { font-size: 16px; font-weight: 600; padding-bottom: var(--s-3); border-bottom: 1px solid var(--grey-200); margin-bottom: var(--s-1); }
+.coopc-info .info-row { grid-template-columns: minmax(120px, 190px) 1fr; padding: 10px 0; }
+.coopc-info .info-row dt { font-weight: 600; font-size: 14px; }
+.coopc-info .info-row dd { border-left: 1px solid var(--grey-200); padding-left: var(--s-4); font-size: 14px; overflow-wrap: anywhere; }
+.form-grid .full.coopc-card { padding: 0 var(--s-4); }
+
+/* Package progress rows (Farming Progress) */
+.coopc-pp-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.coopc-pp { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(0, 2fr); gap: var(--s-6); padding: var(--s-5) 0; border-bottom: 1px solid var(--grey-200); }
+.coopc-pp:first-child { padding-top: 0; }
+.coopc-pp:last-child { border-bottom: 0; padding-bottom: 0; }
+.coopc-pp__chips { display: flex; flex-wrap: wrap; gap: 8px 12px; margin-top: 12px; }
+.coopc-pp__chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--grey-800); }
+.coopc-pp__chip .pill { height: 24px; padding: 0 10px; font-size: 12px; }
+
+/* Milestone detail */
+.coopc-ev-list { list-style: none; margin: 0; padding: 0; }
+.coopc-ev { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: var(--s-3); padding: 14px 0; border-bottom: 1px solid var(--grey-200); align-items: start; }
+.coopc-ev:last-child { border-bottom: 0; }
+.coopc-ev__icon { width: 40px; height: 40px; border-radius: var(--r-md); background: var(--primary-50); color: var(--primary-500); display: grid; place-items: center; }
+.coopc-ev__name { font-weight: 600; overflow-wrap: anywhere; }
+.coopc-ev__tags { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.coopc-cond { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.coopc-cond li { display: flex; gap: 10px; font-size: 14px; align-items: flex-start; }
+.coopc-cond svg { flex: none; margin-top: 3px; color: var(--primary-500); }
+.coopc-gate { display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+.coopc-gate__row { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); padding: 8px 0; border-bottom: 1px solid var(--grey-200); }
+.coopc-gate__row:last-child { border-bottom: 0; }
+.coopc-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 10px; }
+.coopc-submit-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); flex-wrap: wrap; }
+
+/* Sale and harvest forms */
+.coopc-gross { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); padding: 14px 16px; border-radius: var(--r-md); background: var(--primary-50); border: 1px solid var(--primary-100); }
+.coopc-gross strong { font-size: 20px; }
+.coopc-toggle-row { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s-4); padding: 14px 16px; border-radius: var(--r-md); border: 1px solid var(--grey-200); background: var(--white); }
+
+/* Calculation table (distribution detail) */
+.coopc-calc-wrap { overflow-x: auto; }
+.coopc-calc { width: 100%; border-collapse: collapse; min-width: 640px; }
+.coopc-calc th { text-align: left; font-size: 12px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--grey-700); padding: 12px; border-bottom: 1px solid var(--grey-200); background: var(--grey-100); }
+.coopc-calc td { padding: 14px 12px; border-bottom: 1px solid var(--grey-200); font-size: 14px; vertical-align: top; }
+.coopc-calc .step { width: 40px; color: var(--grey-700); }
+.coopc-calc .amt { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: 600; }
+.coopc-calc tr.is-total td { background: var(--primary-50); font-weight: 700; }
+.coopc-calc .why { display: block; color: var(--grey-700); font-weight: 400; font-size: 13px; margin-top: 2px; }
+
+/* Profit share illustration card */
+.coopc-illus { border: 1.5px dashed var(--gold-500); background: var(--gold-100); border-radius: var(--r-xl); padding: var(--s-6); }
+.coopc-illus__rows { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-2) var(--s-6); margin-top: var(--s-4); }
+.coopc-illus__row { display: flex; justify-content: space-between; gap: var(--s-3); padding: 8px 0; border-bottom: 1px solid rgba(10, 20, 14, 0.12); font-size: 14px; }
+.coopc-illus__row strong { font-variant-numeric: tabular-nums; }
+
+/* Distribution detail */
+.coopc-payline { display: flex; justify-content: space-between; gap: var(--s-3); padding: 10px 0; border-bottom: 1px solid var(--grey-200); font-size: 14px; }
+.coopc-payline:last-child { border-bottom: 0; }
+.coopc-note { padding: 12px 14px; border-radius: var(--r-md); background: var(--grey-100); font-size: 14px; }
+
+@media (max-width: 900px) {
+  .coopc-pp { grid-template-columns: 1fr; gap: var(--s-3); }
+  .coopc-illus__rows { grid-template-columns: 1fr; }
+}
+@media (max-width: 720px) {
+  .coopc-info .info-row dd { border-left: 0; padding-left: 0; }
+  .coopc-ev { grid-template-columns: 40px minmax(0, 1fr); }
+  .coopc-ev__tags { grid-column: 2; justify-content: flex-start; }
+  .coopc-illus { padding: var(--s-4); }
+  .coopc-submit-bar .btn { width: 100%; }
+}
+
+/* Workaround for a shell issue at phone width: the topbar's content (menu button, nowrap title, bell and account)
+   has a min-content width of about 396px once the web font loads, which widens the whole page. Scoped to pages
+   that carry .coopc-page so no other group is affected. */
+.app-shell:has(.coopc-page) .app-topbar,
+.app-shell:has(.coopc-page) .app-topbar__title,
+.app-shell:has(.coopc-page) .app-topbar__right { min-width: 0; }
+.app-shell:has(.coopc-page) .app-topbar__title { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-shell:has(.coopc-page) .app-topbar__right { flex: none; }
+
+/* Grid children must be allowed to shrink so wide tables scroll inside their own card. */
+.coopc-page .grid-main > * { min-width: 0; }
