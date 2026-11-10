@@ -1,4 +1,4 @@
-import { Plus, Trash2, Pencil } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 import { TextField, SelectField, Checkbox, Button, Banner, InfoList, StatusPill } from '../ui/index.js';
 import { BANKS } from '../inv/invData.js';
 import { NIGERIAN_LGAS } from '../../data/nigeriaLgas.js';
@@ -7,19 +7,17 @@ import {
   COOP_DOCUMENTS, DRAFT_COOP_NAME, NIGERIAN_STATES, PHONE_ERROR, PHONE_HINT, isEmail, isNigerianPhone, normalisePhone, slug,
 } from './authUtils.js';
 
-export const COOP_STEPS = ['Organisation', 'Representatives', 'Documents', 'Payout account', 'Review'];
+export const COOP_STEPS = ['Organisation', 'Documents', 'Payout account', 'Review'];
 export const COOP_STEP_META = [
   { title: 'Organisation details', help: 'Tell us who you are. Use the details exactly as they appear on your registration certificate.' },
-  { title: 'Authorised representatives', help: 'List the people who are allowed to act for the cooperative, for example the chairperson and the secretary.' },
   { title: 'Documents', help: 'Upload clear copies. Reviewers check each one. In this demo files stay in your browser and only the file name is saved.' },
   { title: 'Payout account details', help: 'Enter the cooperative bank and full 10-digit account number. Only the last 4 digits are retained in this demo.' },
   { title: 'Review and submit', help: 'Check everything. You can go back and change any section before you submit.' },
 ];
-const REP_ROLES = ['Chairman', 'Chairperson', 'President', 'Secretary', 'Treasurer', 'Administrator', 'Other'];
 
 export function initialCoopForm(org, user) {
   const docs = {};
-  (org.documents || []).forEach((d) => { docs[d.type] = { ...d }; });
+  (org.documents || []).forEach((d) => { docs[d.type] = { ...d, status: d.status === 'Pending' ? 'Uploaded' : d.status || 'Uploaded' }; });
   return {
     name: org.name === DRAFT_COOP_NAME ? '' : org.name || '',
     regNumber: org.regNumber || '',
@@ -29,7 +27,6 @@ export function initialCoopForm(org, user) {
     address: org.address || '',
     state: org.state || '',
     lga: org.lga || '',
-    reps: org.representatives?.length ? org.representatives.map((r) => ({ ...r })) : [{ name: user.name || '', role: '' }],
     docs,
     bankName: org.bank?.name || '',
     accountNumber: '',
@@ -56,21 +53,15 @@ export function validateCoopStep(step, f) {
     else if (!stateLgas.includes(f.lga)) e.lga = 'Choose an LGA in the selected state.';
   }
   if (step === 1) {
-    f.reps.forEach((r, i) => {
-      if (r.name.trim().length < 2) e[`rep-${i}-name`] = 'Enter the full name.';
-      if (!r.role) e[`rep-${i}-role`] = 'Choose a role.';
-    });
-  }
-  if (step === 2) {
     COOP_DOCUMENTS.filter((d) => d.required).forEach((d) => {
       if (!f.docs[d.type]?.file) e[`doc-${slug(d.type)}`] = 'Upload this document to continue.';
     });
   }
-  if (step === 3) {
+  if (step === 2) {
     if (!/^\d{10}$/.test(f.accountNumber)) e.accountNumber = 'Enter the full 10-digit account number.';
     if (f.bankName.trim().length < 2) e.bankName = 'Choose the name of the bank.';
   }
-  if (step === 4 && !f.confirm) e.confirm = 'Tick the box to confirm before you submit.';
+  if (step === 3 && !f.confirm) e.confirm = 'Tick the box to confirm before you submit.';
   return e;
 }
 
@@ -88,21 +79,20 @@ export function coopPatch(step, f) {
       lga: f.lga.trim(),
     };
   }
-  if (step === 1) return { representatives: f.reps.filter((r) => r.name.trim() || r.role).map((r) => ({ name: r.name.trim(), role: r.role })) };
-  if (step === 2) {
+  if (step === 1) {
     const order = COOP_DOCUMENTS.map((d) => d.type);
     const types = [...order, ...Object.keys(f.docs).filter((t) => !order.includes(t))];
     return {
       documents: types.filter((t) => f.docs[t]?.file).map((t) => {
         const d = f.docs[t];
-        return { id: d.id || `d-${slug(t)}`, type: t, file: d.file, size: d.size || null, status: d.status || 'Uploaded', reviewer: d.reviewer ?? null, reviewedAt: d.reviewedAt ?? null };
+        return { id: d.id || `d-${slug(t)}`, type: t, file: d.file, size: d.size || null, status: d.status === 'Pending' ? 'Uploaded' : d.status || 'Uploaded', reviewer: d.reviewer ?? null, reviewedAt: d.reviewedAt ?? null };
       }),
     };
   }
-  if (step === 3) return { bank: { name: f.bankName.trim(), accountName: f.name.trim(), last4: f.accountNumber.slice(-4) } };
+  if (step === 2) return { bank: { name: f.bankName.trim(), accountName: f.name.trim(), last4: f.accountNumber.slice(-4) } };
   return {};
 }
-export const coopAllPatch = (f) => [0, 1, 2, 3].reduce((acc, s) => ({ ...acc, ...coopPatch(s, f) }), {});
+export const coopAllPatch = (f) => [0, 1, 2].reduce((acc, s) => ({ ...acc, ...coopPatch(s, f) }), {});
 
 // ---------- step bodies ----------
 export function OrganisationStep({ form, errors, set }) {
@@ -122,36 +112,6 @@ export function OrganisationStep({ form, errors, set }) {
   );
 }
 
-export function RepresentativesStep({ form, errors, set, clear }) {
-  const setRow = (i, key, value) => {
-    set('reps', form.reps.map((r, j) => (j === i ? { ...r, [key]: value } : r)));
-    clear(`rep-${i}-${key}`);
-  };
-  const add = () => set('reps', [...form.reps, { name: '', role: '' }]);
-  const remove = (i) => {
-    set('reps', form.reps.filter((_, j) => j !== i));
-    clear(...Object.keys(errors).filter((k) => k.startsWith('rep-')));
-  };
-  return (
-    <div className="stack">
-      {form.reps.map((r, i) => {
-        const options = !r.role || REP_ROLES.includes(r.role) ? REP_ROLES : [...REP_ROLES, r.role];
-        return (
-          <fieldset className="auth-rep" key={i}>
-            <legend className="auth-rep__legend">Representative {i + 1}</legend>
-            <TextField label="Full name" required autoComplete="name" placeholder="Enter full name" value={r.name} error={errors[`rep-${i}-name`]} onChange={(e) => setRow(i, 'name', e.target.value)} />
-            <SelectField label="Role" required placeholder="Select role" options={options} value={r.role} error={errors[`rep-${i}-role`]} onChange={(e) => setRow(i, 'role', e.target.value)} />
-            <Button variant="danger-outline" size="sm" className="auth-rep__remove" onClick={() => remove(i)} disabled={form.reps.length === 1} aria-label={`Remove representative ${i + 1}`}>
-              <Trash2 size={16} />Remove
-            </Button>
-          </fieldset>
-        );
-      })}
-      <div><Button variant="outline-green" onClick={add}><Plus size={16} />Add another representative</Button></div>
-    </div>
-  );
-}
-
 export function DocumentsStep({ form, errors, set, clear }) {
   return (
     <div className="stack-lg">
@@ -161,6 +121,7 @@ export function DocumentsStep({ form, errors, set, clear }) {
           label={d.type}
           hint={d.hint}
           required={d.required}
+          uploadedStatus="Uploaded"
           doc={form.docs[d.type]}
           error={errors[`doc-${slug(d.type)}`]}
           onChange={(doc) => {
@@ -213,21 +174,15 @@ export function CoopReviewStep({ form, errors, set, goTo }) {
           ['State and LGA', [form.state, form.lga].filter(Boolean).join(', ') || '-'],
         ]} />
       </ReviewSection>
-      <ReviewSection title="Authorised representatives" onEdit={() => goTo(1)}>
-        <InfoList compact items={form.reps.map((r, i) => [`Representative ${i + 1}`, `${r.name || '-'}${r.role ? `, ${r.role}` : ''}`])} />
-      </ReviewSection>
-      <ReviewSection title="Documents" onEdit={() => goTo(2)}>
+      <ReviewSection title="Documents" onEdit={() => goTo(1)}>
         <InfoList compact items={COOP_DOCUMENTS.map((d) => [d.type, form.docs[d.type]?.file
           ? <span className="auth-review__doc">{form.docs[d.type].file} <StatusPill>{form.docs[d.type].status || 'Uploaded'}</StatusPill></span>
           : (d.required ? 'Missing' : 'Not provided')])}
         />
       </ReviewSection>
-      <ReviewSection title="Payout account" onEdit={() => goTo(3)}>
+      <ReviewSection title="Payout account" onEdit={() => goTo(2)}>
         <InfoList compact items={[['Account name', form.name || '-'], ['Bank', form.bankName || '-'], ['Account number', form.accountNumber ? `Ending ${form.accountNumber.slice(-4)}` : '-']]} />
       </ReviewSection>
-      <Banner tone="info" title="What happens after you submit">
-        A CollabFarm reviewer checks your details and documents. Uploaded is not the same as verified: a document counts only after a reviewer marks it Verified. Verification is not a guarantee of funding. You can follow progress on the status page.
-      </Banner>
       <Checkbox checked={form.confirm} onChange={(v) => set('confirm', v)} error={errors.confirm}>
         I confirm that these details are accurate and that I am allowed to submit them for this cooperative.
       </Checkbox>

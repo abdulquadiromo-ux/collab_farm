@@ -1,12 +1,11 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Banknote, Handshake, PackageCheck, Hourglass } from 'lucide-react';
-import { PageHeader, KpiCard, DataTable, StatusPill, Button, Banner, EmptyState, LinkButton, FilterSelect, PageSkeleton } from '../../components/ui/index.js';
+import { PageHeader, KpiCard, DataTable, StatusPill, Button, EmptyState, LinkButton, FilterSelect, PageSkeleton } from '../../components/ui/index.js';
 import { useApp, useSimulatedLoad } from '../../context/AppContext.jsx';
 import { formatNaira, formatDate } from '../../utils/format.js';
 import { sum } from '../../utils/rules.js';
 import { useCoop } from '../../components/coopb/hooks.js';
-import { LIVE_STATUSES } from '../../components/coopb/constants.jsx';
 import { InvestmentModal } from '../../components/coopb/Modals.jsx';
 import { PlainTerms } from '../../components/coopb/Common.jsx';
 import '../../styles/pages/coopb.css';
@@ -43,10 +42,11 @@ export default function Investments() {
   if (loading) return <PageSkeleton />;
   if (!coop) return <div className="page"><EmptyState title="Cooperative not found">Sign in with a cooperative account to see investments.</EmptyState></div>;
 
-  const received = sum(rows, (r) => r.confirmed);
-  const committed = sum(rows, (r) => r.committed);
-  const pending = sum(rows, (r) => Math.max(0, r.committed - r.confirmed));
-  const activePackages = packages.filter((p) => LIVE_STATUSES.includes(p.status) && rows.some((r) => r.packageId === p.id)).length;
+  const totalInvested = sum(rows, (r) => r.confirmed);
+  const activeInvestments = rows.filter((r) => r.status === 'Active').length;
+  const unsettledInvestments = rows.filter((r) => ['Active', 'Overdue'].includes(r.status));
+  const expectedSettlement = sum(unsettledInvestments, (r) => r.expectedSettlementAmount);
+  const overdueSettlement = sum(rows.filter((r) => r.status === 'Overdue'), (r) => r.expectedSettlementAmount);
   const pkgOptions = packages.filter((p) => rows.some((r) => r.packageId === p.id)).map((p) => ({ value: p.id, label: p.name }));
 
   const columns = [
@@ -76,15 +76,11 @@ export default function Investments() {
     <div className="page">
       <PageHeader title="Investments" subtitle="Track investor funding into your packages. Only money confirmed by the financial partner counts as received." />
 
-      <Banner tone="info" title="Committed is not received money">
-        An investor's commitment is a promise. It is not money you can spend or plan against. It counts as received only after the regulated financial partner confirms it, and even then it is released to the project in stages after evidence is approved.
-      </Banner>
-
       <div className="kpi-grid coopb-kpis">
-        <KpiCard icon={<Banknote size={20} />} label="Total Funding Received" value={formatNaira(received)}><div className="kpi-card__delta">Confirmed by the financial partner</div></KpiCard>
-        <KpiCard icon={<Handshake size={20} />} tone="gold" label="Committed" value={formatNaira(committed)}><div className="kpi-card__delta">Promised by investors, not the same as received</div></KpiCard>
-        <KpiCard icon={<PackageCheck size={20} />} label="Active Packages" value={activePackages}><div className="kpi-card__delta">Open for funding or running, with investors</div></KpiCard>
-        <KpiCard icon={<Hourglass size={20} />} tone="gold" label="Pending Confirmation" value={formatNaira(pending)}><div className="kpi-card__delta">Committed, still waiting for the partner</div></KpiCard>
+        <KpiCard icon={<Banknote size={20} />} label="Total Invested" value={formatNaira(totalInvested)}><div className="kpi-card__delta">Confirmed investment across your packages</div></KpiCard>
+        <KpiCard icon={<PackageCheck size={20} />} label="Active Investments" value={activeInvestments}><div className="kpi-card__delta">Investments currently in progress</div></KpiCard>
+        <KpiCard icon={<Handshake size={20} />} label="Expected Settlement Amount" value={formatNaira(expectedSettlement)}><div className="kpi-card__delta">Expected amounts for active and overdue investments</div></KpiCard>
+        <KpiCard icon={<Hourglass size={20} />} tone="gold" label="Overdue Investment" value={formatNaira(overdueSettlement)}><div className="kpi-card__delta">Expected settlement amount on overdue investments</div></KpiCard>
       </div>
 
       {rows.length === 0 ? (

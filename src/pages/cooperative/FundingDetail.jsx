@@ -1,25 +1,24 @@
 import { useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { Banknote, Sprout, RefreshCw, CircleDot, Users, HandCoins, Pencil, Send, Undo2, FilePlus2 } from 'lucide-react';
+import { Banknote, Sprout, RefreshCw, CircleDot, Users, HandCoins, Pencil, Send, Undo2 } from 'lucide-react';
 import { Breadcrumb, PageHeader, Card, CardHeader, KpiStrip, Tabs, StatusPill, Banner, EmptyState, LinkButton, Button } from '../../components/ui/index.js';
 import { Photo } from '../../components/common/Photo.jsx';
 import { useApp } from '../../context/AppContext.jsx';
-import { formatNaira, formatDate } from '../../utils/format.js';
+import { formatNaira } from '../../utils/format.js';
 import { useCoop, usePackageActions } from '../../components/coopb/hooks.js';
 import { useSubmitFlow } from '../../components/coopb/SubmitFlow.jsx';
-import { EDITABLE_STATUSES, BUDGET_CHANGE_STATUSES, PHOTO_THEME } from '../../components/coopb/constants.jsx';
+import { EDITABLE_STATUSES, PHOTO_THEME } from '../../components/coopb/constants.jsx';
 import { agreementSummary } from '../../components/coopb/logic.js';
 import { StatusFlow, TierDot, UnverifiedBanner } from '../../components/coopb/Common.jsx';
-import { OverviewTab, BudgetTab, FundingTab, TranchesTab, AgreementsTab } from '../../components/coopb/DetailTabs.jsx';
-import { BudgetChangeModal, WithdrawModal } from '../../components/coopb/Modals.jsx';
+import { OverviewTab, FarmersTab, FundingTab, TranchesTab } from '../../components/coopb/DetailTabs.jsx';
+import { WithdrawModal } from '../../components/coopb/Modals.jsx';
 import '../../styles/pages/coopb.css';
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
-  { id: 'budget', label: 'Budget' },
-  { id: 'funding', label: 'Funding and investors' },
+  { id: 'farmers', label: 'Farmers' },
+  { id: 'funding', label: 'Investors' },
   { id: 'tranches', label: 'Tranches' },
-  { id: 'agreements', label: 'Agreements' },
 ];
 
 export default function FundingDetail() {
@@ -27,10 +26,9 @@ export default function FundingDetail() {
   const { data, user } = useApp();
   const { verified, farms } = useCoop();
   const [params, setParams] = useSearchParams();
-  const { withdrawPackage, requestBudgetChange, openBudgetChange } = usePackageActions();
+  const { withdrawPackage } = usePackageActions();
   const { ask, dialog } = useSubmitFlow({ verified });
   const [withdrawOpen, setWithdrawOpen] = useState(false);
-  const [changeOpen, setChangeOpen] = useState(false);
 
   const pkg = data.packages.find((p) => p.id === id && p.coopId === user.orgId);
   if (!pkg) {
@@ -45,8 +43,6 @@ export default function FundingDetail() {
 
   const tab = TABS.find((t) => t.id === params.get('tab'))?.id || 'overview';
   const editable = EDITABLE_STATUSES.includes(pkg.status);
-  const canChange = BUDGET_CHANGE_STATUSES.includes(pkg.status);
-  const openChange = openBudgetChange(pkg);
   const agreements = agreementSummary(pkg, data);
   const fundingApp = data.applications.filter((a) => a.packageId === pkg.id && a.type === 'Funding application')[0] || null;
   const tierName = pkg.tier || 'Custom';
@@ -72,7 +68,6 @@ export default function FundingDetail() {
             {editable && <LinkButton to={`/coop/funding/new?edit=${pkg.id}`} variant="outline"><Pencil size={16} />Edit</LinkButton>}
             {editable && <Button onClick={() => ask(pkg)} disabled={!verified}><Send size={16} />Submit for review</Button>}
             {pkg.status === 'Submitted' && <Button variant="danger-outline" onClick={() => setWithdrawOpen(true)}><Undo2 size={16} />Withdraw</Button>}
-            {canChange && <Button variant="outline-green" onClick={() => setChangeOpen(true)} disabled={!!openChange || !verified}><FilePlus2 size={16} />Request budget change</Button>}
           </>
         )}
       />
@@ -92,22 +87,6 @@ export default function FundingDetail() {
         <Banner tone="info" title={pkg.status === 'Submitted' ? 'Waiting for a reviewer' : `Under review${fundingApp?.reviewer ? ` by ${fundingApp.reviewer}` : ''}`}>
           {fundingApp?.notes || 'You cannot edit the package while it is being reviewed. You will be notified when there is a decision.'}
           {pkg.status === 'Submitted' && ' You can still withdraw the request before review starts.'}
-        </Banner>
-      )}
-      {['Approved', 'Open for Funding', 'Funding Target Reached', 'Active'].includes(pkg.status) && (
-        <Banner tone="success" title="Approved by CollabFarm">
-          {fundingApp?.notes && fundingApp.stage === 'Approved' ? fundingApp.notes : 'The budget has been approved. Approval is not a guarantee of success or returns.'}
-        </Banner>
-      )}
-      {openChange && (
-        <Banner tone="info" title="Budget change request in progress">
-          You asked to change the package amount from {formatNaira(openChange.previousAmount ?? pkg.amount)} to {formatNaira(openChange.amount)} on {formatDate(openChange.submittedAt)}. It needs two different reviewers. Stage: {openChange.stage}.
-        </Banner>
-      )}
-      {agreements.missing.length > 0 && tab !== 'agreements' && (
-        <Banner tone="warn" title="Funding steps are blocked until mandatory agreements are signed">
-          <ul className="coopb-terms">{agreements.missing.map((m) => <li key={m.key}><strong>{m.label}.</strong> {m.detail}.</li>)}</ul>
-          <div style={{ marginTop: 6 }}><Link to="/coop/contracts" className="strong">Open Contracts</Link></div>
         </Banner>
       )}
 
@@ -134,14 +113,12 @@ export default function FundingDetail() {
         onChange={(t) => setParams((prev) => { const n = new URLSearchParams(prev); n.set('tab', t); return n; }, { replace: true })}
       />
       {tab === 'overview' && <OverviewTab pkg={pkg} farms={farms} />}
-      {tab === 'budget' && <BudgetTab pkg={pkg} />}
+      {tab === 'farmers' && <FarmersTab pkg={pkg} />}
       {tab === 'funding' && <FundingTab pkg={pkg} />}
       {tab === 'tranches' && <TranchesTab pkg={pkg} agreements={agreements} />}
-      {tab === 'agreements' && <AgreementsTab pkg={pkg} agreements={agreements} />}
 
       {dialog}
       <WithdrawModal open={withdrawOpen} onClose={() => setWithdrawOpen(false)} pkg={pkg} onConfirm={(reason) => withdrawPackage(pkg, reason)} />
-      <BudgetChangeModal open={changeOpen} onClose={() => setChangeOpen(false)} pkg={pkg} onSubmit={(amount, reason) => requestBudgetChange(pkg, amount, reason)} />
     </div>
   );
 }

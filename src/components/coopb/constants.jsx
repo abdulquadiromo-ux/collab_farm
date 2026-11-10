@@ -84,19 +84,16 @@ export const FINISHED_STATUSES = ['Completed', 'Failed or Terminated'];
 
 // Status timeline (detail page). `hint` is plain language for what the stage means.
 export const STAGES = [
-  { id: 'Draft', hint: 'You are preparing the request' },
-  { id: 'Submitted', hint: 'Sent to CollabFarm' },
-  { id: 'Under Review', hint: 'A reviewer checks it' },
+  { id: 'Under Review', hint: 'Package submitted for review' },
   { id: 'Approved', hint: 'Budget approved' },
-  { id: 'Open for Funding', hint: 'Investors can commit' },
-  { id: 'Funding Target Reached', hint: 'Target met' },
-  { id: 'Active', hint: 'Farming and payments' },
+  { id: 'Ongoing', hint: 'Farming and payments' },
   { id: 'Completed', hint: 'Cycle closed' },
 ];
 
 const STAGE_INDEX = {
-  Draft: 0, Submitted: 1, 'Under Review': 2, 'Changes Requested': 2, Approved: 3, 'Open for Funding': 4,
-  'Funding Target Reached': 5, 'Ready for Disbursement': 5, Active: 6, Paused: 6, 'Failed or Terminated': 6, Completed: 7,
+  Draft: 0, Submitted: 0, 'Under Review': 0, 'Changes Requested': 0,
+  Approved: 1, 'Open for Funding': 1, 'Funding Target Reached': 1, 'Ready for Disbursement': 1,
+  Active: 2, Paused: 2, 'Failed or Terminated': 2, Completed: 3,
 };
 export const stageIndex = (status) => (status in STAGE_INDEX ? STAGE_INDEX[status] : 0);
 

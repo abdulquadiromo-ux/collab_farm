@@ -6,7 +6,7 @@ import WizardFrame from '../../components/auth/WizardFrame.jsx';
 import { gateFor } from '../../components/auth/OrgGate.jsx';
 import { useOrgContext, useOrgWorkflow } from '../../components/auth/useOrgWorkflow.js';
 import {
-  COOP_STEPS, COOP_STEP_META, CoopReviewStep, DocumentsStep, OrganisationStep, PayoutStep, RepresentativesStep,
+  COOP_STEPS, COOP_STEP_META, CoopReviewStep, DocumentsStep, OrganisationStep, PayoutStep,
   coopAllPatch, coopPatch, initialCoopForm, validateCoopStep,
 } from '../../components/auth/CoopWizardSteps.jsx';
 import { EDITABLE_STATUSES, focusFirstInvalid } from '../../components/auth/authUtils.js';
@@ -26,7 +26,11 @@ function CoopWizard({ org, user }) {
   const { submitOrg } = useOrgWorkflow();
   const navigate = useNavigate();
   const reopened = org.status === 'Additional Information Required';
-  const [step, setStep] = useState(() => (reopened ? 0 : Math.min(Math.max(org.onboarding?.step ?? 0, 0), LAST)));
+  const [step, setStep] = useState(() => {
+    const saved = org.onboarding?.step ?? 0;
+    const migrated = saved >= 2 ? saved - 1 : saved;
+    return reopened ? 0 : Math.min(Math.max(migrated, 0), LAST);
+  });
   const [form, setForm] = useState(() => initialCoopForm(org, user));
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
@@ -77,7 +81,7 @@ function CoopWizard({ org, user }) {
   return (
     <WizardFrame
       title="Set up your cooperative"
-      subtitle="Five short steps. Your progress is saved after every step, so you can leave and come back."
+      subtitle="Four short steps. Your progress is saved after every step, so you can leave and come back."
       steps={COOP_STEPS}
       step={step}
       stepTitle={meta.title}
@@ -90,10 +94,9 @@ function CoopWizard({ org, user }) {
       banner={reopened && (org.adminNote || org.reviewNote) ? <Banner tone="warn" title="A reviewer asked for more information">{org.adminNote || org.reviewNote}</Banner> : null}
     >
       {step === 0 && <OrganisationStep {...shared} />}
-      {step === 1 && <RepresentativesStep {...shared} />}
-      {step === 2 && <DocumentsStep {...shared} />}
-      {step === 3 && <PayoutStep {...shared} />}
-      {step === 4 && <CoopReviewStep {...shared} goTo={goTo} />}
+      {step === 1 && <DocumentsStep {...shared} />}
+      {step === 2 && <PayoutStep {...shared} />}
+      {step === 3 && <CoopReviewStep {...shared} goTo={goTo} />}
     </WizardFrame>
   );
 }

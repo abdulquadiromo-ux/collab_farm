@@ -6,7 +6,7 @@ import { Card, CardHeader, PageHeader, PageSkeleton, Breadcrumb, Banner, Button,
 import { formatNaira, formatDate, formatDateTime } from '../../utils/format.js';
 import { budgetReconciles, allocationCheck } from '../../utils/rules.js';
 import {
-  isMaterialChange, slaInfo, farmerAllocations, farmerAgreement, agreementB, adminFunctionOf, coopReadiness, nowIso, todayIso, AGREEMENT_NAMES,
+  isMaterialChange, slaInfo, farmerAllocations, farmerAgreement, agreementB, adminFunctionOf, nowIso, todayIso, AGREEMENT_NAMES,
 } from '../../components/adma/helpers.js';
 import { MissingRecord, NotesThread, DocStatusPill, Stat } from '../../components/adma/Parts.jsx';
 import { ReasonDialog } from '../../components/adma/Dialogs.jsx';
@@ -53,7 +53,6 @@ export default function ApplicationReview() {
   const allocs = farmerAllocations(data, pkg.id);
   const alloc = allocationCheck(pkg, allocs);
   const bContract = agreementB(data, pkg.id);
-  const coopCheck = coop ? coopReadiness(coop) : null;
   const lines = pkg.budget || [];
   const linesApproved = lines.length > 0 && lines.every((b) => lineReviews[b.id]?.decision === 'Approved');
   const canReview = stageOpen && isReviewer;
@@ -184,10 +183,6 @@ export default function ApplicationReview() {
   const risks = data.riskCases.filter((r) => r.packageId === pkg.id);
   const docRows = [
     ...lines.map((b) => ({ id: `q-${b.id}`, type: 'Supplier quotation', for: `${b.category}: ${b.description}`, status: b.docs ? 'Uploaded' : 'Not uploaded' })),
-    ...(coopCheck ? [
-      { id: 'land', type: 'Land-access evidence', for: coop.name, status: coopCheck.land.state },
-      { id: 'payout', type: 'Payout account letter', for: coop.name, status: coopCheck.payout.state },
-    ] : []),
   ];
   const openFor = {
     status: isFunding && app.stage === 'Approved',

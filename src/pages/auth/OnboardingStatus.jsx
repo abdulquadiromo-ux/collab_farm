@@ -161,7 +161,7 @@ function CoopSummary({ org }) {
             {docs.map((d) => (
               <li key={d.id || d.type}>
                 <span><span className="strong small">{d.type}</span><span className="caption muted" style={{ display: 'block' }}>{d.file}</span></span>
-                <StatusPill>{d.status || 'Uploaded'}</StatusPill>
+                <StatusPill>{d.status === 'Pending' ? 'Uploaded' : d.status || 'Uploaded'}</StatusPill>
               </li>
             ))}
           </ul>

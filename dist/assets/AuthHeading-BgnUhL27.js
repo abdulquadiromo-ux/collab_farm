@@ -1,0 +1,1 @@
+import{j as a,a7 as t}from"./index-DfEDz6cY.js";function n({title:e,subtitle:s,className:h,id:r}){return a.jsxs("header",{className:t("auth-head",h),children:[a.jsx("h1",{className:"auth__title",id:r,children:e}),s&&a.jsx("p",{className:"auth-sub",children:s})]})}export{n as A};

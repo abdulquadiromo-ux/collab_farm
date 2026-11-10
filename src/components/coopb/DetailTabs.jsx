@@ -3,20 +3,18 @@ import { CheckCircle2, AlertCircle, ArrowRight, FileSignature } from 'lucide-rea
 import { Card, CardHeader, InfoList, Checklist, StatusPill, EmptyState, DataTable, LinkButton, Banner, Avatar } from '../ui/index.js';
 import { useApp } from '../../context/AppContext.jsx';
 import { formatNaira, formatDate, formatDateTime, percent } from '../../utils/format.js';
-import { budgetReconciles, canReleaseTranche, packageFunding, sixAmounts } from '../../utils/rules.js';
+import { budgetReconciles, canReleaseTranche } from '../../utils/rules.js';
 import { EDITABLE_STATUSES } from './constants.jsx';
-import { ThreeRules, PlainTerms, ReconPanel, MoneyStat } from './Common.jsx';
-import { aggregateInvestments, SIX_AMOUNT_HELP, trancheAmounts } from './logic.js';
+import { PlainTerms, ReconPanel } from './Common.jsx';
+import { trancheAmounts } from './logic.js';
 
 const PRE_APPROVAL = ['Draft', 'Submitted', 'Under Review', 'Changes Requested'];
 export const itemApproval = (pkg, b) => (PRE_APPROVAL.includes(pkg.status) ? 'Pending' : b.approval || 'Approved');
 
 /* ---------------------------------------------------------------- Overview */
 export function OverviewTab({ pkg, farms }) {
-  const { data } = useApp();
   const items = (pkg.inclusions?.length ? pkg.inclusions.map((i) => i.item) : (pkg.budget || []).map((b) => b.description)).filter(Boolean);
   const chosen = farms.filter((f) => (pkg.farmIds || []).includes(f.id));
-  const allocatedFarmers = data.farmers.filter((f) => f.allocationPackageId === pkg.id);
   const range = pkg.returnLow || pkg.returnHigh ? `${pkg.returnLow}% to ${pkg.returnHigh}%` : null;
   return (
     <div className="stack-lg">
@@ -26,16 +24,13 @@ export function OverviewTab({ pkg, farms }) {
           <p style={{ marginBottom: 12 }}>{pkg.description || 'No description yet.'}</p>
           <InfoList compact items={[
             ['Crop or activity', pkg.crop || pkg.category],
-            ['Season', pkg.season || '-'],
             ['Farming dates', pkg.startDate && pkg.endDate ? `${formatDate(pkg.startDate)} to ${formatDate(pkg.endDate)}` : 'Not set'],
             ['Funding closes', pkg.closingDate ? formatDate(pkg.closingDate) : 'Not set'],
             ['Minimum funding target', pkg.minTarget ? formatNaira(pkg.minTarget) : 'Not set'],
             ['Investment per investor', `${formatNaira(pkg.minInvestment)} to ${formatNaira(pkg.maxInvestment)}`],
             ['Expected return (estimate)', `${range ? `${range}, about ` : ''}${pkg.expectedRoiPct}% (an estimate, not a promise)`],
             ['Cooperative share', `${pkg.coopSharePct}% of profit`],
-            ['Return structure', pkg.returnStructure ? `${pkg.returnStructure}` : '-'],
             ['Expected output', pkg.expectedOutput || 'Not set'],
-            ['Regions', pkg.regions || '-'],
           ]} />
         </Card>
         <Card>
@@ -48,21 +43,34 @@ export function OverviewTab({ pkg, farms }) {
               <ul className="coopb-plain-list">{chosen.map((f) => <li key={f.id}>{f.name}, {f.location} ({f.areaHa} ha)</li>)}</ul>
             </>
           )}
-          {allocatedFarmers.length > 0 && (
-            <>
-              <hr className="divider" />
-              <div className="strong small" style={{ marginBottom: 8 }}>Farmers and investment amounts</div>
-              <ul className="coopb-plain-list">{allocatedFarmers.map((f) => <li key={f.id}><span className="strong">{f.name}</span> <span className="muted">({f.farmingCategory || f.cropType || 'Category not set'}) — {formatNaira(f.allocatedAmount)}</span></li>)}</ul>
-            </>
-          )}
         </Card>
       </div>
-      <Card>
-        <CardHeader title="Main risks" subtitle="Shown to investors before they commit." />
-        {pkg.risks?.length ? <ul className="coopb-plain-list">{pkg.risks.map((r) => <li key={r}>{r}</li>)}</ul> : <p className="muted small">No risks listed.</p>}
-      </Card>
-      <ThreeRules />
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ Farmers */
+export function FarmersTab({ pkg }) {
+  const { data } = useApp();
+  const farmers = data.farmers.filter((f) => f.allocationPackageId === pkg.id);
+  const columns = [
+    { key: 'name', header: 'Farmer', render: (f) => <span className="strong">{f.name}</span> },
+    { key: 'cropType', header: 'Crop or activity', render: (f) => f.farmingCategory || f.cropType || '-' },
+    { key: 'allocatedAmount', header: 'Allocated amount', render: (f) => <span className="nowrap">{formatNaira(f.allocatedAmount || 0)}</span> },
+    { key: 'agreementStatus', header: 'Agreement', render: (f) => <StatusPill>{f.agreementStatus || 'Not Signed'}</StatusPill> },
+    { key: 'status', header: 'Verification', render: (f) => <StatusPill>{f.status || 'Pending'}</StatusPill> },
+  ];
+  return (
+    <DataTable
+      columns={columns}
+      rows={farmers}
+      pageSize={10}
+      searchKeys={['name', 'cropType', 'farmingCategory']}
+      searchPlaceholder="Search farmers"
+      totalLabel="farmers"
+      emptyTitle="No farmers allocated"
+      emptyText="Farmers allocated to this package will appear here."
+    />
   );
 }
 
@@ -121,10 +129,7 @@ export function BudgetTab({ pkg }) {
 /* -------------------------------------------------------- Funding and investors */
 export function FundingTab({ pkg }) {
   const { data } = useApp();
-  const f = packageFunding(pkg);
   const invs = data.investments.filter((i) => i.packageId === pkg.id);
-  const total = aggregateInvestments(invs);
-  const six = sixAmounts(total);
   const name = (id) => data.investors.find((i) => i.id === id)?.name || 'Investor';
   const rows = invs.map((i) => ({ ...i, investorName: name(i.investorId) }));
   const columns = [
@@ -137,38 +142,6 @@ export function FundingTab({ pkg }) {
   ];
   return (
     <div className="stack-lg">
-      <Card>
-        <CardHeader title="Funding progress" subtitle="Committed money is a promise. Only confirmed money has been received." />
-        <div className="coopb-stat-grid">
-          <MoneyStat label="Funding target" value={formatNaira(pkg.amount)} sub={pkg.minTarget ? `Minimum to go ahead: ${formatNaira(pkg.minTarget)}` : undefined} />
-          <MoneyStat tone="green" label="Confirmed received" value={formatNaira(pkg.raised)} sub={`${f.pct}% of the target`} />
-          <MoneyStat tone="amber" label="Committed, not yet confirmed" value={formatNaira(f.awaitingConfirmation)} sub={`${f.committedPct}% committed in total`} />
-        </div>
-        <div style={{ marginTop: 16 }}>
-          <div className="coopb-bar" role="img" aria-label={`${f.pct} percent confirmed and ${f.committedPct} percent committed of the target`}>
-            <div className="coopb-bar__committed" style={{ width: `${Math.min(100, f.committedPct)}%` }} />
-            <div className="coopb-bar__confirmed" style={{ width: `${Math.min(100, f.pct)}%` }} />
-          </div>
-          <div className="coopb-legend" style={{ marginTop: 10 }}>
-            <span><span className="dot" style={{ background: 'var(--green-500)' }} />Confirmed received</span>
-            <span><span className="dot" style={{ background: 'var(--gold-300)' }} />Committed, awaiting confirmation</span>
-          </div>
-        </div>
-      </Card>
-
-      <Card>
-        <CardHeader title="The six amounts" subtitle={`Totals across the ${invs.length} investment${invs.length === 1 ? '' : 's'} listed below. Each amount is tracked separately.`} />
-        <div className="coopb-six">
-          {six.map((a, i) => (
-            <div key={a.key} className={`coopb-six__row${a.key === 'confirmed' ? ' coopb-six__row--key' : ''}`}>
-              <span className="coopb-six__no">{i + 1}</span>
-              <div><div className="strong small">{a.label}</div><div className="caption muted">{SIX_AMOUNT_HELP[a.key]}</div></div>
-              <div className="coopb-six__val">{formatNaira(a.value)}</div>
-            </div>
-          ))}
-        </div>
-      </Card>
-
       <div className="stack-sm">
         <h2>Investors</h2>
         <p className="muted small">Shown by display name only. Contact details are never shared with the cooperative.</p>

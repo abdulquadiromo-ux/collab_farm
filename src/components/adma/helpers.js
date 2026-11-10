@@ -164,10 +164,11 @@ export function checkSummary(subject) {
 
 // ---------- cooperative verification ----------
 export const COOP_STATUSES = ['Draft', 'Submitted', 'Under Review', 'Additional Information Required', 'Verified', 'Rejected', 'Suspended'];
-export const COOP_MANDATORY_DOCS = ['Registration certificate', 'Proof of address', 'Leadership identification', 'Land-access evidence', 'Payout account letter'];
+export const COOP_MANDATORY_DOCS = ['Registration certificate', 'Proof of address'];
+const REMOVED_COOP_DOCS = ['Leadership identification', 'Land-access evidence', 'Payout account letter'];
 
 export function coopDocRows(coop) {
-  const docs = coop.documents || [];
+  const docs = (coop.documents || []).filter((doc) => !REMOVED_COOP_DOCS.includes(doc.type));
   const rows = COOP_MANDATORY_DOCS.map((type) => {
     const d = docs.find((x) => x.type === type);
     return d ? { ...d, mandatory: true } : { id: `missing-${slug(type)}`, type, file: null, status: 'Not uploaded', mandatory: true, missing: true };
@@ -186,12 +187,8 @@ export function coopReadiness(coop) {
   });
   const payoutNameOk = !coop.bank || lc(coop.bank.accountName) === lc(coop.name);
   if (!payoutNameOk) problems.push('Payout account name does not match the registered cooperative name');
-  const landDoc = rows.find((r) => r.type === 'Land-access evidence');
-  const payoutDoc = rows.find((r) => r.type === 'Payout account letter');
   return {
     rows, problems, ready: problems.length === 0,
-    land: { ok: landDoc?.status === 'Verified', state: landDoc?.missing ? 'Not uploaded' : landDoc?.status || 'Not uploaded' },
-    payout: { ok: payoutNameOk && payoutDoc?.status === 'Verified', nameOk: payoutNameOk, state: payoutDoc?.missing ? 'Not uploaded' : payoutDoc?.status || 'Not uploaded' },
     verifiedCount: rows.filter((r) => r.mandatory && r.status === 'Verified').length,
     mandatoryCount: COOP_MANDATORY_DOCS.length,
   };

@@ -10,7 +10,7 @@ export const MEMBERSHIP_OPTIONS = ['Active member', 'Applicant'];
 export const LAND_ACCESS_TYPES = ['Lease agreement', 'Certificate of Occupancy', 'Community consent letter', 'Family or customary land', 'Rented land'];
 export const SEASON_OPTIONS = ['Wet 2026', 'Dry 2026/27', 'Wet 2027'];
 export const FARM_DOC_TYPES = ['Lease agreement', 'Survey plan', 'Community consent letter', 'Certificate of Occupancy', 'Inspection report', 'Other'];
-export const COOP_DOC_TYPES = ['Registration certificate', 'Proof of address', 'Leadership identification', 'Land-access evidence', 'Payout account letter', 'Other'];
+export const COOP_DOC_TYPES = ['Registration certificate', 'Proof of address', 'Other'];
 
 const ACRE_TO_HA = 0.404686;
 export const toHa = (size, unit) => {

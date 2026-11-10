@@ -100,9 +100,6 @@ export const NIGERIAN_STATES = [
 export const COOP_DOCUMENTS = [
   { type: 'Registration certificate', hint: 'Official government issued certificate of registration.', required: true },
   { type: 'Proof of address', hint: 'A recent utility bill or tenancy document for the cooperative office.', required: true },
-  { type: 'Leadership identification', hint: 'Valid identification for the authorised representatives.', required: true },
-  { type: 'Land-access evidence', hint: 'Lease, allocation letter or community consent for the land you farm. Needed before you can request funding.', required: false },
-  { type: 'Payout account letter', hint: 'Letter from the bank confirming the cooperative payout account.', required: true },
 ];
 export const ACCEPTED_EXT = ['pdf', 'jpg', 'jpeg', 'png'];
 export const MAX_FILE_BYTES = 5 * 1024 * 1024;
