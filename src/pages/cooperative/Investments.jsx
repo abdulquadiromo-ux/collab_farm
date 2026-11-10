@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Banknote, Handshake, PackageCheck, Hourglass } from 'lucide-react';
-import { PageHeader, KpiCard, DataTable, StatusPill, Progress, Button, Banner, EmptyState, LinkButton, FilterSelect, PageSkeleton } from '../../components/ui/index.js';
+import { PageHeader, KpiCard, DataTable, StatusPill, Button, Banner, EmptyState, LinkButton, FilterSelect, PageSkeleton } from '../../components/ui/index.js';
 import { useApp, useSimulatedLoad } from '../../context/AppContext.jsx';
-import { formatNaira, formatDate, percent } from '../../utils/format.js';
+import { formatNaira, formatDate } from '../../utils/format.js';
 import { sum } from '../../utils/rules.js';
 import { useCoop } from '../../components/coopb/hooks.js';
 import { LIVE_STATUSES } from '../../components/coopb/constants.jsx';
@@ -32,12 +32,13 @@ export default function Investments() {
       pkg: mine.get(i.packageId),
       packageName: mine.get(i.packageId).name,
       investorName: data.investors.find((v) => v.id === i.investorId)?.name || 'Investor',
-      pct: percent(mine.get(i.packageId).raised, mine.get(i.packageId).amount),
+      expectedSettlementAmount: Math.round((Number(i.committed || i.intended) || 0) * (1 + (Number(mine.get(i.packageId).expectedRoiPct) || 0) / 100)),
       agreement: data.contracts.find((c) => c.id === i.agreementId) || null,
+      tranches: data.tranches.filter((t) => t.packageId === i.packageId).sort((a, b) => a.number - b.number),
     }));
     const by = { newest: (a, b) => String(b.dateInvested).localeCompare(String(a.dateInvested)), oldest: (a, b) => String(a.dateInvested).localeCompare(String(b.dateInvested)), largest: (a, b) => b.committed - a.committed, smallest: (a, b) => a.committed - b.committed };
     return [...list].sort(by[sort]);
-  }, [data.investments, data.investors, data.contracts, packages, sort]);
+  }, [data.investments, data.investors, data.contracts, data.tranches, packages, sort]);
 
   if (loading) return <PageSkeleton />;
   if (!coop) return <div className="page"><EmptyState title="Cooperative not found">Sign in with a cooperative account to see investments.</EmptyState></div>;
@@ -49,27 +50,19 @@ export default function Investments() {
   const pkgOptions = packages.filter((p) => rows.some((r) => r.packageId === p.id)).map((p) => ({ value: p.id, label: p.name }));
 
   const columns = [
+    { key: 'investorName', header: 'Investor name', render: (r) => <span className="strong">{r.investorName}</span> },
     {
       key: 'packageName', header: 'Package',
       render: (r) => (
         <Link to={`/coop/funding/${r.packageId}`} className="coopb-cell-link">
           <span className="strong coopb-trunc">{r.packageName}</span>
-          <span className="cell-sub">{r.pkg.category}</span>
         </Link>
       ),
     },
-    { key: 'investorName', header: 'Investor', render: (r) => <span className="strong">{r.investorName}</span> },
-    {
-      key: 'committed', header: 'Amount committed',
-      render: (r) => (<><span className="nowrap">{formatNaira(r.committed)}</span>{r.confirmed < r.committed && <span className="coopb-awaiting">Awaiting confirmation</span>}</>),
-    },
-    { key: 'confirmed', header: 'Amount confirmed', render: (r) => <span className="nowrap">{formatNaira(r.confirmed)}</span> },
-    {
-      key: 'pct', header: 'Funding Progress',
-      render: (r) => (<div className="coopb-prog"><Progress value={r.pct} label={`${r.packageName} funding progress`} /><span className="small strong">{r.pct}%</span></div>),
-    },
-    { key: 'expectedSettlementDate', header: 'Expected settlement', render: (r) => <span className="nowrap">{formatDate(r.expectedSettlementDate)}</span> },
-    { key: 'dateInvested', header: 'Date', render: (r) => <span className="nowrap">{formatDate(r.dateInvested)}</span> },
+    { key: 'committed', header: 'Amount', render: (r) => <span className="nowrap">{formatNaira(r.committed || r.intended)}</span> },
+    { key: 'expectedSettlementAmount', header: 'Expected settlement amount', render: (r) => <span className="nowrap">{formatNaira(r.expectedSettlementAmount)}</span> },
+    { key: 'expectedSettlementDate', header: 'Expected settlement date', render: (r) => <span className="nowrap">{r.expectedSettlementDate ? formatDate(r.expectedSettlementDate) : '-'}</span> },
+    { key: 'dateInvested', header: 'Date invested', render: (r) => <span className="nowrap">{formatDate(r.dateInvested)}</span> },
     { key: 'status', header: 'Status', render: (r) => <StatusPill>{r.status}</StatusPill> },
     { key: 'actions', header: 'Actions', render: (r) => <Button variant="outline" size="sm" onClick={() => setSelected(r)} aria-label={`View investment ${r.ref}`}>View</Button> },
   ];

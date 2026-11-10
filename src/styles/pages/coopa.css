@@ -85,12 +85,22 @@
 .coopa-head__who { display: flex; align-items: center; gap: var(--s-5); min-width: 0; }
 .coopa-head__name { font-size: 22px; font-weight: 700; line-height: 1.2; }
 .coopa-nin { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
-.coopa-facts { display: grid; grid-template-columns: repeat(4, minmax(0, auto)); margin: 0; }
+.coopa-facts { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); margin: 0; }
 .coopa-facts > div { padding: 0 var(--s-6); border-left: 1px solid var(--grey-200); }
 .coopa-facts dt { font-size: 14px; font-weight: 600; }
 .coopa-facts dd { margin: 4px 0 0; font-size: 14px; color: var(--grey-700); }
 .coopa-tabpanel { padding-top: var(--s-5); }
 .coopa-box { border: 1px solid var(--grey-200); border-radius: var(--r-md); padding: 14px 16px; background: var(--white); }
+.coopa-farms__header { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); padding: 0 4px 14px; }
+.coopa-farms__header .coopa-h3 { margin: 0; }
+.coopa-farms .data-table { min-width: 0; }
+.coopa-farms .data-table td { height: 52px; }
+.coopa-farm-name { display: inline-flex; align-items: center; gap: 12px; color: var(--grey-1000); font-weight: 500; min-width: 0; }
+.coopa-farm-name img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex: none; }
+.coopa-farms .pill { min-width: 86px; height: 34px; border-radius: 9px; }
+.coopa-loans .data-table { min-width: 720px; }
+.coopa-loan-id { display: inline-block; max-width: 112px; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; white-space: nowrap; }
+.coopa-loans .pill { min-width: 84px; }
 .coopa-ready { border: 1px solid var(--yellow-500); border-radius: var(--r-md); padding: 14px 16px; background: #fffaeb; }
 .coopa-ready--ok { border-color: var(--primary-100); background: var(--primary-50); }
 .coopa-checks { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
@@ -103,6 +113,10 @@
 .coopa-stats span { font-size: 13px; color: var(--grey-700); }
 .coopa-stats strong { font-size: 18px; font-weight: 600; }
 .coopa-stats em { font-style: normal; font-size: 12px; color: var(--grey-700); }
+.coopa-performance .coopa-stats > div { min-height: 94px; flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; padding: 18px 12px; }
+.coopa-performance .coopa-stats span { color: var(--grey-1000); font-size: 13px; }
+.coopa-performance .coopa-stats strong { flex: none; font-size: 13px; font-weight: 600; text-align: right; }
+.coopa-performance > .btn { width: 100%; min-height: 42px; height: auto; padding: 10px 12px; text-align: center; }
 
 /* ---------- cooperative profile ---------- */
 .coopa-profile-head { display: flex; align-items: center; gap: var(--s-5); flex-wrap: wrap; border-color: var(--primary-100); }

@@ -5,7 +5,7 @@ import { useApp, simulate } from '../../context/AppContext.jsx';
 import { useCoop, usePackageActions } from '../../components/coopb/hooks.js';
 import { WIZARD_STEPS, EDITABLE_STATUSES, TEMPLATE_CATEGORIES, TIERS } from '../../components/coopb/constants.jsx';
 import {
-  emptyForm, templateForm, packageToForm, formToPackage, validateBasics, validateDetails, submissionChecklist,
+  emptyForm, templateForm, packageToForm, formToPackage, submissionChecklist,
 } from '../../components/coopb/logic.js';
 import { BasicsStep, DetailsStep, ReviewStep } from '../../components/coopb/CreateSteps.jsx';
 import { UnverifiedBanner } from '../../components/coopb/Common.jsx';
@@ -17,7 +17,7 @@ export default function CreateFunding() {
   const { data, user, toast } = useApp();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const { coop, verified, farms } = useCoop();
+  const { coop, verified, farms, farmers } = useCoop();
   const { saveDraft, submitPackage } = usePackageActions();
 
   const editId = params.get('edit');
@@ -27,7 +27,11 @@ export default function CreateFunding() {
   const platformMin = data.platformSettings?.investor?.minimumInvestment;
 
   const buildInitial = () => {
-    if (existing) return packageToForm(existing);
+    if (existing) {
+      const form = packageToForm(existing);
+      if (!form.farmers.length) form.farmers = data.farmers.filter((f) => f.allocationPackageId === existing.id).map((f) => ({ farmerId: f.id, allocatedAmount: f.allocatedAmount || '' }));
+      return form;
+    }
     if (TEMPLATE_CATEGORIES.includes(paramCategory) && TIERS.includes(paramTier)) return templateForm(paramCategory, paramTier);
     return emptyForm();
   };
@@ -71,30 +75,8 @@ export default function CreateFunding() {
   const checklist = useMemo(() => submissionChecklist(form, { verified, platformMin }), [form, verified, platformMin]);
   const blockers = checklist.filter((c) => !c.ok);
 
-  // Validate every step before `target`. Returns the first step with errors, or -1.
-  const validateUpTo = (target) => {
-    let all = {};
-    let firstBad = -1;
-    for (let i = 0; i < target; i += 1) {
-      const e = i === 0 ? validateBasics(form, { platformMin }) : i === 1 ? validateDetails(form) : {};
-      if (Object.keys(e).length && firstBad === -1) firstBad = i;
-      all = { ...all, ...e };
-    }
-    setErrors(all);
-    return firstBad;
-  };
-
-  const goTo = (n) => {
-    if (n > step) {
-      const bad = validateUpTo(n);
-      if (bad !== -1) {
-        toast('Some fields need attention. They are marked in red.', 'error');
-        setStep(bad);
-        return;
-      }
-    }
-    setStep(n);
-  };
+  // Let users move between tabs freely; the submission checklist validates required fields on review/submit.
+  const goTo = (n) => setStep(n);
 
   const onContinue = () => goTo(Math.min(step + 1, WIZARD_STEPS.length - 1));
 
@@ -198,11 +180,11 @@ export default function CreateFunding() {
 
       <fieldset className="coopb-fieldset" disabled={disabled}>
         <legend className="sr-only">{WIZARD_STEPS[step].label}</legend>
-        {step === 0 && <BasicsStep form={form} set={set} errors={errors} farms={farms} />}
+        {step === 0 && <BasicsStep form={form} set={set} errors={errors} farmers={farmers} packageId={existing?.id} />}
         {step === 1 && <DetailsStep form={form} set={set} errors={errors} setBudget={setBudget} clearError={clearError} />}
         {step === 2 && (
           <ReviewStep
-            form={form} farms={farms} checklist={checklist} goTo={goTo}
+            form={form} checklist={checklist} goTo={goTo}
             confirmed={confirmed} setConfirmed={(v) => { setConfirmed(v); setConfirmError(''); }} confirmError={confirmError}
             existingStatus={existing?.status} reviewerNotes={reviewerNotes}
           />

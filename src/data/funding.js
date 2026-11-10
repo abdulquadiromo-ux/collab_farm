@@ -31,12 +31,41 @@ export const PACKAGES = [
   { id: 'pkg-12', coopId: 'coop-1', name: 'Cattle Fattening Draft', category: 'Custom', tier: 'Custom', description: 'Draft custom package for a short cattle fattening cycle.', amount: 2200000, raised: 0, committed: 0, minInvestment: 100000, maxInvestment: 700000, tenureMonths: 5, expectedRoiPct: 16, coopSharePct: 10, status: 'Draft', farmersCount: 5, investorsCount: 0, closingDate: '', startDate: '', endDate: '', createdAt: '2026-10-28', ...common, inclusions: [{ item: 'Feed', amount: 1200000 }], budget: [] },
 ];
 
-export const TRANCHE_PLAN = [
+export const TRANCHE_PLANS = {
+  'Crop Farming': [
   { number: 1, name: 'Project preparation', purpose: 'Approved land preparation, supplier deposits and initial farming inputs', share: 0.3, conditions: ['Cooperative accountability agreement signed', 'Supplier quotations verified', 'Farmer participation agreements signed'] },
   { number: 2, name: 'Planting', purpose: 'Released after evidence confirms preparation and input delivery milestones', share: 0.3, conditions: ['Input delivery receipts uploaded', 'Land preparation inspection report approved'] },
   { number: 3, name: 'Crop maintenance', purpose: 'Released after relevant farming activities are verified', share: 0.25, conditions: ['Planting report with photos and GPS', 'Field inspection completed'] },
   { number: 4, name: 'Harvest', purpose: 'Harvesting, storage and other agreed expenses', share: 0.15, conditions: ['Crop maintenance report approved', 'Storage arrangements confirmed'] },
-];
+  ],
+  Fishery: [
+    { number: 1, name: 'Pond preparation', purpose: 'Prepare ponds, water systems and initial supplies before stocking', share: 0.25, conditions: ['Cooperative accountability agreement signed', 'Pond inspection approved', 'Water quality test recorded'] },
+    { number: 2, name: 'Stocking and feed', purpose: 'Purchase fingerlings and deliver the first feed allocation', share: 0.35, conditions: ['Fingerling supplier verified', 'Stocking quantities and receipts recorded', 'Farmer participation agreements signed'] },
+    { number: 3, name: 'Fish growth and care', purpose: 'Support feed, water quality management and fish health during the cycle', share: 0.25, conditions: ['Growth and mortality report submitted', 'Water quality and pond inspection approved'] },
+    { number: 4, name: 'Harvest and sale', purpose: 'Fund harvest, handling, storage and market delivery', share: 0.15, conditions: ['Harvest weights verified', 'Sales or buyer delivery records submitted'] },
+  ],
+  'Mixed Farming': [
+    { number: 1, name: 'Farm setup', purpose: 'Prepare land, animal housing and shared farm infrastructure', share: 0.25, conditions: ['Cooperative accountability agreement signed', 'Land and housing inspection approved', 'Supplier quotations verified'] },
+    { number: 2, name: 'Crops and livestock inputs', purpose: 'Deliver seeds, young stock, feed and other initial inputs', share: 0.3, conditions: ['Input delivery receipts uploaded', 'Stock and seed quantities recorded', 'Farmer participation agreements signed'] },
+    { number: 3, name: 'Growing and husbandry', purpose: 'Support crop care, animal health and ongoing farm operations', share: 0.25, conditions: ['Crop and livestock progress report submitted', 'Field or animal health inspection approved'] },
+    { number: 4, name: 'Harvest and processing', purpose: 'Support crop harvest, animal sale, storage and agreed processing', share: 0.2, conditions: ['Harvest or sales quantities verified', 'Storage or processing records submitted'] },
+  ],
+  Livestock: [
+    { number: 1, name: 'Housing and stock preparation', purpose: 'Prepare animal housing, fencing, water and purchase approved stock', share: 0.3, conditions: ['Cooperative accountability agreement signed', 'Housing and fencing inspection approved', 'Stock supplier verified'] },
+    { number: 2, name: 'Feed and animal health', purpose: 'Provide initial feed, vaccinations and veterinary support', share: 0.25, conditions: ['Stock delivery and count recorded', 'Veterinary and vaccination plan approved', 'Farmer participation agreements signed'] },
+    { number: 3, name: 'Rearing and monitoring', purpose: 'Support feed and care while animals grow to the agreed target', share: 0.25, conditions: ['Weight or herd progress report submitted', 'Animal health inspection approved'] },
+    { number: 4, name: 'Sale and closeout', purpose: 'Prepare animals for sale and record proceeds and final costs', share: 0.2, conditions: ['Sale weights and buyer records verified', 'Final livestock and cost reconciliation submitted'] },
+  ],
+  Poultry: [
+    { number: 1, name: 'Housing and brooding setup', purpose: 'Prepare poultry housing, biosecurity and approved chicks', share: 0.3, conditions: ['Cooperative accountability agreement signed', 'Poultry house and biosecurity inspection approved', 'Chick supplier verified'] },
+    { number: 2, name: 'Brooding and early care', purpose: 'Provide starter feed, heat, vaccines and early veterinary care', share: 0.3, conditions: ['Chick delivery count recorded', 'Feed and vaccination receipts uploaded', 'Farmer participation agreements signed'] },
+    { number: 3, name: 'Growing and flock care', purpose: 'Support feed and flock health through the grow-out period', share: 0.25, conditions: ['Flock mortality and growth report submitted', 'Veterinary or farm inspection approved'] },
+    { number: 4, name: 'Processing and sale', purpose: 'Support agreed processing, transport and market delivery', share: 0.15, conditions: ['Sale or processing quantities verified', 'Buyer and delivery records submitted'] },
+  ],
+};
+
+export const TRANCHE_PLAN = TRANCHE_PLANS['Crop Farming'];
+export const tranchePlanFor = (category) => TRANCHE_PLANS[category] || TRANCHE_PLAN;
 
 // Tranche statuses per package. pkg-1 and pkg-6, pkg-7 are active, pkg-3 and pkg-9 are completed.
 const trancheStates = {
@@ -51,7 +80,7 @@ const trancheStates = {
 };
 const pkgAmount = Object.fromEntries(PACKAGES.map((p) => [p.id, p.amount]));
 export const TRANCHES = Object.entries(trancheStates).flatMap(([pkgId, states]) =>
-  TRANCHE_PLAN.map((t, i) => ({
+  tranchePlanFor(PACKAGES.find((p) => p.id === pkgId)?.category).map((t, i) => ({
     id: `${pkgId}-t${t.number}`, packageId: pkgId, number: t.number, name: t.name, purpose: t.purpose, conditions: t.conditions,
     amount: Math.round(pkgAmount[pkgId] * t.share), status: states[i],
     approvedAt: states[i] === 'Released' ? `2026-0${3 + i}-1${i + 2}T10:00:00` : null,

@@ -1,24 +1,33 @@
 import { useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { Check, Eye, EyeOff, Pencil, Send, Trash2, X } from 'lucide-react';
+import { Eye, EyeOff, Pencil, Plus, Send, Trash2 } from 'lucide-react';
 import {
-  Avatar, Banner, Breadcrumb, Button, Card, CardHeader, DataTable, EmptyState, InfoList, LinkButton, PageHeader, PageSkeleton, StatusPill, Tabs, Timeline,
+  Avatar, Banner, Breadcrumb, Button, Card, CardHeader, DataTable, EmptyState, InfoList, LinkButton, PageHeader, PageSkeleton, StatusPill, Tabs,
 } from '../../components/ui/index.js';
 import { useApp, useSimulatedLoad } from '../../context/AppContext.jsx';
-import { formatDate, formatDateShort, formatDateTime, formatNaira, cx } from '../../utils/format.js';
-import { statusTone } from '../../utils/status.js';
+import { formatDate, formatDateShort, formatNaira } from '../../utils/format.js';
 import { ReminderModal } from '../../components/coopa/ReminderModal.jsx';
 import { RemoveFarmerModal } from '../../components/coopa/RemoveFarmerModal.jsx';
-import { farmSizeLabel, fmtHa, maskNin, toHa, useCoop } from '../../components/coopa/helpers.js';
+import { AddFarmModal } from '../../components/coopa/AddFarmModal.jsx';
+import { maskNin, useCoop } from '../../components/coopa/helpers.js';
 import '../../styles/pages/coopa.css';
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
-  { id: 'allocation', label: 'Farm and allocation' },
-  { id: 'agreement', label: 'Agreement' },
+  { id: 'farms', label: 'Farms' },
+  { id: 'investments', label: 'Investments' },
   { id: 'activity', label: 'Activity and records' },
-  { id: 'history', label: 'History' },
 ];
+
+function categoryForFarm(farm) {
+  if (farm.farmingCategory || farm.category) return farm.farmingCategory || farm.category;
+  const crop = String(farm.crop || '').toLowerCase();
+  if (/mixed/.test(crop)) return 'Mixed Farming';
+  if (/fish|aqua|catfish|tilapia/.test(crop)) return 'Fishery';
+  if (/poultry|chick|broiler|layer/.test(crop)) return 'Poultry';
+  if (/livestock|cattle|goat|sheep|graz/.test(crop)) return 'Livestock';
+  return crop ? 'Crop Farming' : '-';
+}
 
 export default function FarmerProfile() {
   const { id } = useParams();
@@ -29,23 +38,45 @@ export default function FarmerProfile() {
   const [showNin, setShowNin] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [reminding, setReminding] = useState(false);
+  const [addingFarm, setAddingFarm] = useState(false);
   const tab = TABS.some((t) => t.id === sp.get('tab')) ? sp.get('tab') : 'overview';
   const farmer = farmers.find((f) => f.id === id);
 
   const rel = useMemo(() => {
     if (!farmer) return null;
-    const contracts = data.contracts.filter((c) => c.type === 'C' && c.partyId === farmer.id);
     const inputs = data.inputRecords.filter((i) => i.farmerId === farmer.id);
     const obligations = data.obligations.filter((o) => o.farmerId === farmer.id);
     const payments = data.disbursements.filter((d) => d.recipientType === 'Farmer' && d.recipientId === farmer.id);
-    const pkgId = farmer.allocationPackageId || contracts[0]?.packageId || inputs[0]?.packageId || obligations[0]?.packageId || null;
-    const pkg = data.packages.find((p) => p.id === pkgId) || null;
-    const allocated = Number(farmer.allocatedAmount) || 0;
-    const cash = payments.filter((p) => p.status === 'Disbursed').reduce((s, p) => s + p.amount, 0);
-    const inKind = inputs.filter((i) => i.delivered).reduce((s, i) => s + i.cost, 0);
-    const history = data.audit.filter((a) => a.entityType === 'Farmer' && a.entityId === farmer.id).sort((a, b) => new Date(b.at) - new Date(a.at));
-    return { contracts, inputs, obligations, payments, pkg, allocated, cash, inKind, outstanding: Math.max(0, allocated - cash - inKind), history, farm: farms.find((f) => f.id === farmer.farmId) || null };
-  }, [farmer, data, farms]);
+    const loanGroups = new Map();
+    data.disbursements
+      .filter((d) => d.recipientType === 'Farmer' && d.recipientId === farmer.id && d.status === 'Disbursed')
+      .forEach((d) => {
+        const group = loanGroups.get(d.packageId) || [];
+        group.push(d);
+        loanGroups.set(d.packageId, group);
+      });
+    const loans = [...loanGroups.entries()].map(([packageId, entries]) => {
+      const loanObligations = obligations.filter((o) => o.packageId === packageId && o.type === 'Repayment');
+      const dates = entries.map((d) => d.date).filter(Boolean).sort();
+      const dueDates = loanObligations.map((o) => o.dueDate).filter(Boolean).sort();
+      const settled = loanObligations.length > 0 && loanObligations.every((o) => ['Completed', 'Confirmed'].includes(o.status));
+      const overdue = loanObligations.some((o) => o.status === 'Overdue');
+      const pending = loanObligations.some((o) => o.status === 'Pending');
+      const pkgForLoan = data.packages.find((p) => p.id === packageId);
+      const date = dates[0] || '';
+      return {
+        id: `loan-${farmer.id}-${packageId}`,
+        loanId: `LN-${date.slice(2, 4) || '00'}-${`${packageId.replace(/\D/g, '')}${farmer.id.replace(/\D/g, '')}`.padStart(4, '0')}`,
+        amount: entries.reduce((sum, d) => sum + (Number(d.amount) || 0), 0),
+        repaymentAmount: loanObligations.reduce((sum, o) => sum + (Number(o.amount) || 0), 0),
+        repaidAmount: loanObligations.reduce((sum, o) => sum + (Number(o.amountPaid) || (['Completed', 'Confirmed'].includes(o.status) ? Number(o.amount) || 0 : 0)), 0),
+        loanDate: date,
+        dueDate: dueDates[0] || pkgForLoan?.endDate || '',
+        status: settled ? 'Repaid' : overdue ? 'Overdue' : pending ? 'Pending' : 'Active',
+      };
+    }).sort((a, b) => String(b.loanDate).localeCompare(String(a.loanDate)));
+    return { inputs, obligations, payments, loans };
+  }, [farmer, data]);
 
   if (loading) return <PageSkeleton />;
   if (!coop) return <div className="page"><EmptyState title="We could not find your cooperative record" action={<LinkButton to="/coop" variant="outline">Back to dashboard</LinkButton>}>Sign in again with a cooperative account.</EmptyState></div>;
@@ -54,22 +85,10 @@ export default function FarmerProfile() {
   }
 
   const removed = farmer.status === 'Removed';
-  const { contracts, inputs, obligations, payments, pkg, allocated, cash, inKind, outstanding, history, farm } = rel;
-  const agreement = contracts[0] || null;
-  const openObligations = obligations.filter((o) => o.status !== 'Completed' && o.status !== 'Confirmed').length;
-
-  const checks = [
-    { ok: farmer.identityStatus === 'Verified', label: 'Identity verified', fix: 'A CollabFarm reviewer still needs to check this farmer.' },
-    { ok: farmer.membership === 'Active member', label: 'Active cooperative member', fix: `Membership is ${farmer.membership || 'not set'}.` },
-    { ok: Boolean(farmer.consent), label: 'Consent to data use recorded', fix: 'Edit the farmer to record consent.' },
-    { ok: farmer.agreementStatus === 'Signed', label: 'Participation agreement (Agreement C) signed', fix: farmer.agreementStatus === 'Awaiting Signature' ? 'Waiting for the farmer to sign.' : 'Not issued or not signed yet.' },
-  ];
-  const ready = checks.every((c) => c.ok);
-
-  const history2 = [
-    ...history.map((a) => ({ title: a.action, meta: `${a.actor} on ${formatDateTime(a.at)}`, body: [a.summary, a.reason && `Reason: ${a.reason}`].filter(Boolean).join(' '), state: 'done' })),
-    ...(history.some((a) => a.action === 'Farmer added') ? [] : [{ title: 'Added to the cooperative', meta: `${formatDateTime(farmer.dateAdded)} (from the farmer record)`, body: 'Status set to Pending until identity is checked.', state: 'done' }]),
-  ];
+  const { inputs, obligations, payments, loans } = rel;
+  const totalBorrowed = loans.reduce((sum, loan) => sum + loan.amount, 0);
+  const totalRepaid = loans.reduce((sum, loan) => sum + loan.repaidAmount, 0);
+  const repaymentRate = totalBorrowed ? (totalRepaid / totalBorrowed) * 100 : 0;
 
   return (
     <div className="page coopa">
@@ -104,8 +123,6 @@ export default function FarmerProfile() {
             <h2 className="coopa-head__name">{farmer.name}</h2>
             <div className="row-wrap" style={{ gap: 8, marginTop: 6 }}>
               <StatusPill>{farmer.status}</StatusPill>
-              <StatusPill>{`Identity: ${farmer.identityStatus}`}</StatusPill>
-              <StatusPill>{`Agreement: ${farmer.agreementStatus}`}</StatusPill>
             </div>
             <div className="small muted coopa-nin">
               NIN: <span className="nowrap">{showNin ? farmer.nin : maskNin(farmer.nin)}</span>
@@ -115,8 +132,9 @@ export default function FarmerProfile() {
         </div>
         <dl className="coopa-facts">
           <div><dt>Phone number</dt><dd>{farmer.phone}</dd></div>
-          <div><dt>Crop type</dt><dd>{farmer.cropType || '-'}</dd></div>
-          <div><dt>Farm size</dt><dd>{farmSizeLabel(farmer)}</dd></div>
+          <div><dt>Farming category</dt><dd>{farmer.farmingCategory || farmer.cropType || '-'}</dd></div>
+          <div><dt>Bank name</dt><dd>{farmer.bankName || '-'}</dd></div>
+          <div><dt>Account number</dt><dd>{farmer.accountNumber || '-'}</dd></div>
           <div><dt>Date added</dt><dd>{formatDate(farmer.dateAdded)}</dd></div>
         </dl>
       </Card>
@@ -127,102 +145,59 @@ export default function FarmerProfile() {
           <div className="coopa-tabpanel" role="tabpanel">
             {tab === 'overview' && (
               <div className="stack">
-                <div className={cx('coopa-ready', ready && 'coopa-ready--ok')}>
-                  <div className="strong small">{ready ? 'Ready to join a funded project' : 'Not ready for a funded project yet'}</div>
-                  <p className="caption muted">A farmer is not active in a project until identity, membership, consent and agreement checks are all complete.</p>
-                  <ul className="coopa-checks">
-                    {checks.map((c) => (
-                      <li key={c.label} className={c.ok ? 'is-ok' : 'is-no'}>
-                        <span className="coopa-checks__mark">{c.ok ? <Check size={14} strokeWidth={3} /> : <X size={14} strokeWidth={3} />}</span>
-                        <span><strong>{c.label}</strong>{!c.ok && <span className="muted">. {c.fix}</span>}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
                 <InfoList compact items={[
                   ['Full name', farmer.name],
                   ['Gender', farmer.gender || '-'],
                   ['Phone number', farmer.phone],
                   ['Email address', farmer.email || '-'],
                   ['Date of birth', farmer.dob ? formatDateShort(farmer.dob) : '-'],
-                  ['Crop type', farmer.cropType || '-'],
-                  ['Farm size', farmer.farmSize ? `${farmSizeLabel(farmer)} (about ${fmtHa(toHa(farmer.farmSize, farmer.farmSizeUnit))})` : '-'],
+                  ['Farming category', farmer.farmingCategory || farmer.cropType || '-'],
+                  ['Bank name', farmer.bankName || '-'],
+                  ['Account number', farmer.accountNumber || '-'],
                   ['Years of experience', farmer.experienceYears == null || farmer.experienceYears === '' ? '-' : `${farmer.experienceYears} years`],
-                  ['Skills', farmer.skills?.length ? <span className="tag-list">{farmer.skills.map((s) => <span key={s} className="chip coopa-skill">{s}</span>)}</span> : '-'],
                   ['Membership', farmer.membership || '-'],
                   ['Consent to data use', farmer.consent ? 'Recorded' : 'Not recorded'],
-                  ['ID document', farmer.idFile || 'None uploaded'],
-                  ['Notes', farmer.notes || '-'],
                 ]}
                 />
               </div>
             )}
 
-            {tab === 'allocation' && (
-              <div className="stack">
-                <div>
-                  <h3 className="coopa-h3">Assigned farm</h3>
-                  {farm ? (
-                    <div className="coopa-box row between">
-                      <div>
-                        <Link to={`/coop/farms/${farm.id}`} className="strong">{farm.name}</Link>
-                        <div className="cell-sub">{farm.location}. {farm.areaHa} ha. {farm.crop}, {farm.season}</div>
-                      </div>
-                      <StatusPill>{farm.status}</StatusPill>
-                    </div>
-                  ) : (
-                    <Banner tone="info">No farm is assigned yet. {!removed && <Link to={`/coop/farmers/${farmer.id}/edit`} className="strong">Assign a farm</Link>}</Banner>
-                  )}
+            {tab === 'farms' && (
+              <div className="coopa-farms">
+                <div className="coopa-farms__header">
+                  <h3 className="coopa-h3">Farms</h3>
+                  {!removed && <Button variant="outline-green" onClick={() => setAddingFarm(true)}><Plus size={17} />Add Farm</Button>}
                 </div>
-                <div>
-                  <h3 className="coopa-h3">Allocation</h3>
-                  <p className="caption muted" style={{ marginBottom: 8 }}>An allocation is the support approved for this farmer in a funding package. It is a plan, not money received. Cash and goods are counted separately.</p>
-                  {pkg ? (
-                    <InfoList compact items={[
-                      ['Funding package', <Link key="p" to={`/coop/funding/${pkg.id}`} className="strong">{pkg.name}</Link>],
-                      ['Package status', <StatusPill key="s">{pkg.status}</StatusPill>],
-                      ['Approved allocation', allocated ? formatNaira(allocated) : 'Amount not recorded yet'],
-                      ['Paid in cash (confirmed)', formatNaira(cash)],
-                      ['Inputs delivered (goods)', formatNaira(inKind)],
-                      ['Outstanding balance', allocated ? formatNaira(outstanding) : '-'],
-                    ]}
-                    />
-                  ) : (
-                    <EmptyState title="No allocation yet">Farmers need a verified identity and a signed agreement before they can be allocated to a funding package.</EmptyState>
-                  )}
-                  {pkg && <LinkButton to={`/coop/funding/${pkg.id}/allocate`} variant="outline-green" size="sm" className="mt-4">Open allocation</LinkButton>}
-                </div>
+                <DataTable
+                  bare hideFooter pageSize={50} rows={farms} emptyTitle="No farms registered yet"
+                  columns={[
+                    { key: 'name', header: 'Farm', render: (f) => <Link to={`/coop/farms/${f.id}`} className="coopa-farm-name"><img src="/images/hero-farm.jpg" alt="" />{f.name}</Link> },
+                    { key: 'areaHa', header: 'Size', render: (f) => `${f.areaHa} ha` },
+                    { key: 'location', header: 'Location' },
+                    { key: 'category', header: 'Farming category', render: categoryForFarm },
+                    { key: 'status', header: 'Status', render: (f) => <StatusPill tone={f.status === 'Active' ? 'green' : 'gray'}>{f.status}</StatusPill> },
+                  ]}
+                />
               </div>
             )}
 
-            {tab === 'agreement' && (
-              <div className="stack">
-                <Banner tone="info" title="What is Agreement C?">
-                  It is the individual Farmer Participation Agreement. It sets out the support allocated, what it may be used for, reporting duties, any repayment, and what happens if a crop fails. Genuine crop failure is not treated as fraud.
-                </Banner>
-                <div className="coopa-box">
-                  <div className="row between" style={{ flexWrap: 'wrap' }}>
-                    <div>
-                      <div className="strong">Farmer Participation Agreement (Agreement C)</div>
-                      <div className="cell-sub">{agreement ? `Version ${agreement.version}${pkg ? ` for ${data.packages.find((p) => p.id === agreement.packageId)?.name || pkg.name}` : ''}` : 'No agreement issued yet'}</div>
-                    </div>
-                    <StatusPill tone={statusTone(agreement?.status || farmer.agreementStatus)}>{agreement?.status || farmer.agreementStatus}</StatusPill>
-                  </div>
-                  {agreement && (
-                    <InfoList compact items={[
-                      ['Signed by', agreement.signatory || 'Not signed yet'],
-                      ['Signed on', agreement.signedAt ? formatDateTime(agreement.signedAt) : '-'],
-                      ['Language', agreement.language || '-'],
-                      ['Versions', `${agreement.history?.length || 1} recorded. Earlier versions are never overwritten.`],
-                    ]}
-                    />
-                  )}
+            {tab === 'investments' && (
+              <div className="coopa-loans">
+                <div className="coopa-farms__header">
+                  <h3 className="coopa-h3">Loan History</h3>
+                  <LinkButton to="/coop/settlements?tab=obligations" variant="outline-green" size="sm">View All Loans</LinkButton>
                 </div>
-                <div className="row-wrap">
-                  {agreement && <LinkButton to={`/coop/contracts/${agreement.id}`} variant="outline-green" size="sm">Open agreement</LinkButton>}
-                  <LinkButton to="/coop/contracts" variant="outline" size="sm">All contracts</LinkButton>
-                  {!removed && farmer.agreementStatus !== 'Signed' && <Button variant="outline" size="sm" onClick={() => setReminding(true)}><Send size={16} />Remind farmer to sign</Button>}
-                </div>
+                <DataTable
+                  bare hideFooter pageSize={50} rows={loans} emptyTitle="No loan history recorded"
+                  columns={[
+                    { key: 'loanId', header: 'Loan ID', render: (loan) => <span className="coopa-loan-id">{loan.loanId}</span> },
+                    { key: 'amount', header: 'Loan Amount', render: (loan) => formatNaira(loan.amount) },
+                    { key: 'repaymentAmount', header: 'Repayment Amount', render: (loan) => formatNaira(loan.repaymentAmount) },
+                    { key: 'loanDate', header: 'Loan Date', render: (loan) => loan.loanDate ? formatDateShort(loan.loanDate) : '-' },
+                    { key: 'dueDate', header: 'Due Date', render: (loan) => loan.dueDate ? formatDateShort(loan.dueDate) : '-' },
+                    { key: 'status', header: 'Status', render: (loan) => <StatusPill tone={loan.status === 'Repaid' ? 'blue' : loan.status === 'Overdue' ? 'red' : loan.status === 'Pending' ? 'amber' : 'green'}>{loan.status}</StatusPill> },
+                  ]}
+                />
               </div>
             )}
 
@@ -275,31 +250,24 @@ export default function FarmerProfile() {
               </div>
             )}
 
-            {tab === 'history' && (
-              <div className="stack">
-                <p className="caption muted">Every change to this farmer is recorded with who did it and when. Entries cannot be edited or deleted.</p>
-                <Timeline items={history2} />
-              </div>
-            )}
           </div>
         </Card>
 
-        <Card className="coopa-summary">
-          <CardHeader title="Support summary" />
+        <Card className="coopa-summary coopa-performance">
+          <CardHeader title="Performance Summary" />
           <div className="coopa-stats">
-            <div><span>Funding package</span><strong>{pkg ? pkg.name : 'None yet'}</strong></div>
-            <div><span>Approved allocation</span><strong>{allocated ? formatNaira(allocated) : '-'}</strong></div>
-            <div><span>Received so far</span><strong>{formatNaira(cash + inKind)}</strong><em>{formatNaira(cash)} cash, {formatNaira(inKind)} goods</em></div>
-            <div><span>Outstanding balance</span><strong>{allocated ? formatNaira(outstanding) : '-'}</strong></div>
-            <div><span>Open obligations</span><strong>{openObligations}</strong></div>
+            <div><span>Total Loans Taken</span><strong>{loans.length}</strong></div>
+            <div><span>Total Amount Borrowed</span><strong>{formatNaira(totalBorrowed)}</strong></div>
+            <div><span>Total Amount Repaid</span><strong>{formatNaira(totalRepaid)}</strong></div>
+            <div><span>Repayment Rate</span><strong>{repaymentRate.toFixed(1)}%</strong></div>
           </div>
-          <p className="caption muted">Figures are records from the platform. They are not guarantees of yield or repayment.</p>
-          <LinkButton to="/coop/funding" variant="outline" block className="mt-4">View funding</LinkButton>
+          <LinkButton to="/coop/reports" variant="outline" block>View Full Performance Report</LinkButton>
         </Card>
       </div>
 
       <ReminderModal open={reminding} farmer={farmer} coop={coop} onClose={() => setReminding(false)} />
       <RemoveFarmerModal open={removing} farmer={farmer} onClose={() => { setRemoving(false); }} />
+      <AddFarmModal open={addingFarm} onClose={() => setAddingFarm(false)} coop={coop} farms={farms} onAdded={() => setSp({ tab: 'farms' }, { replace: true })} />
     </div>
   );
 }

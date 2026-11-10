@@ -58,7 +58,6 @@ export const coopRoutes = [
   { path: 'funding', file: 'cooperative/Funding' },
   { path: 'funding/new', file: 'cooperative/CreateFunding' },
   { path: 'funding/:id', file: 'cooperative/FundingDetail' },
-  { path: 'funding/:id/allocate', file: 'cooperative/Allocation' },
   { path: 'investments', file: 'cooperative/Investments' },
   { path: 'disbursements', file: 'cooperative/Disbursements' },
   { path: 'farming-progress', file: 'cooperative/FarmingProgress' },

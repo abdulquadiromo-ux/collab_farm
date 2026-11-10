@@ -1,18 +1,18 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, AlertCircle, Pencil, Landmark, ClipboardCheck } from 'lucide-react';
-import { Card, SectionHead, TextField, SelectField, TextAreaField, MoneyField, Field, Checkbox, InfoList, Banner, StatusPill } from '../ui/index.js';
+import { CheckCircle2, AlertCircle, Pencil, Landmark, ClipboardCheck, Plus, Trash2 } from 'lucide-react';
+import { Avatar, Button, Card, SectionHead, TextField, SelectField, TextAreaField, MoneyField, Field, Checkbox, InfoList, Banner } from '../ui/index.js';
 import { formatNaira, formatDate, cx } from '../../utils/format.js';
-import { TIERS, ALL_CATEGORIES, SEASONS } from './constants.jsx';
-import { monthsBetween, regionsFor } from './logic.js';
+import { TIERS, ALL_CATEGORIES } from './constants.jsx';
+import { monthsBetween } from './logic.js';
 import { PlainTerms, ReconPanel, FundingPlanTable, ThreeRules } from './Common.jsx';
 import BudgetEditor from './BudgetEditor.jsx';
 
 const inputProps = (form, set, key) => ({ value: form[key], onChange: (e) => set(key, e.target.value) });
 
-export function BasicsStep({ form, set, errors, farms }) {
-  const toggleFarm = (id) => set('farmIds', form.farmIds.includes(id) ? form.farmIds.filter((x) => x !== id) : [...form.farmIds, id]);
+export function BasicsStep({ form, set, errors, farmers = [], packageId }) {
+  const [openFarmerRow, setOpenFarmerRow] = useState(null);
   const months = monthsBetween(form.startDate, form.endDate);
-  const regions = regionsFor(form.farmIds, farms);
   return (
     <Card tone="green">
       <SectionHead icon="1" title="Package Basics" />
@@ -22,31 +22,55 @@ export function BasicsStep({ form, set, errors, farms }) {
         <SelectField label="Category" required placeholder="Choose a category" options={ALL_CATEGORIES} {...inputProps(form, set, 'category')} error={errors.category} />
         <TextField label="Tenure (months)" required type="number" min={1} max={36} placeholder="4" {...inputProps(form, set, 'tenureMonths')} error={errors.tenureMonths} hint="How long the farming cycle lasts, from start to final settlement." />
         <TextAreaField className="full" label="Short Description" required placeholder="What will this package fund, and who benefits?" {...inputProps(form, set, 'description')} error={errors.description} />
-        <TextField label="Crop or activity" required placeholder="For example, Maize, Catfish, Broilers" {...inputProps(form, set, 'crop')} error={errors.crop} />
-        <SelectField label="Season" required placeholder="Choose a season" options={SEASONS} {...inputProps(form, set, 'season')} error={errors.season} />
-
         <div className="full">
-          <Field label="Farm locations" required error={errors.farmIds} hint="Choose from the farms registered by your cooperative. Investors see only the area, never exact addresses.">
+          <Field label="Farmers" hint="Choose farmers to include, then enter how much to invest in each one.">
             {() => (
-              <div className="coopb-farms" role="group" aria-label="Farm locations">
-                {farms.length === 0 && <p className="muted small">Your cooperative has no farms yet. Add one under Farms and Plots first.</p>}
-                {farms.map((f) => {
-                  const off = f.status !== 'Active';
+              <div className="stack-sm">
+                {(form.farmers.length ? form.farmers : [{ farmerId: '', allocatedAmount: '' }]).map((allocation, index) => {
+                  const selectedIds = form.farmers.map((f) => f.farmerId).filter(Boolean);
+                  const selectedFarmer = farmers.find((f) => f.id === allocation.farmerId);
                   return (
-                    <label key={f.id} className={cx('coopb-farm', form.farmIds.includes(f.id) && 'coopb-farm--on', off && 'coopb-farm--off')}>
-                      <input type="checkbox" checked={form.farmIds.includes(f.id)} disabled={off && !form.farmIds.includes(f.id)} onChange={() => toggleFarm(f.id)} />
-                      <span>
-                        <span className="strong small">{f.name}</span>
-                        <span className="cell-sub">{f.location} . {f.areaHa} ha . {f.crop}</span>
-                        <span className="caption muted">Land access: {f.landAccess}{off ? ' . Inactive farm' : ''}</span>
-                      </span>
-                    </label>
+                    <div key={`${allocation.farmerId || 'farmer'}-${index}`} className="form-grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', alignItems: 'end', gap: 16 }}>
+                      <div className="field" style={{ position: 'relative' }}>
+                        <span className="field__label">Farmer</span>
+                        <button type="button" className="input" aria-label="Choose a farmer" aria-expanded={openFarmerRow === index} onClick={() => setOpenFarmerRow(openFarmerRow === index ? null : index)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left', minHeight: 48 }}>
+                          {selectedFarmer ? <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Avatar name={selectedFarmer.name} size="sm" /><span><span style={{ display: 'block' }}>{selectedFarmer.name}</span><span className="cell-sub">{selectedFarmer.farmingCategory || selectedFarmer.cropType || 'Category not set'}</span></span></span> : <span className="muted">Choose a farmer</span>}
+                          <span aria-hidden="true">▾</span>
+                        </button>
+                        {openFarmerRow === index && <div role="listbox" aria-label="Farmers" style={{ position: 'absolute', zIndex: 20, top: '100%', left: 0, right: 0, maxHeight: 260, overflowY: 'auto', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.12)' }}>
+                          {farmers.filter((farmer) => farmer.id === allocation.farmerId || !selectedIds.includes(farmer.id)).map((farmer) => (
+                            <button key={farmer.id} type="button" role="option" aria-selected={farmer.id === allocation.farmerId} disabled={!!farmer.allocationPackageId && farmer.allocationPackageId !== packageId} onClick={() => {
+                              const updated = [...form.farmers];
+                              if (!updated.length) updated.push({ farmerId: '', allocatedAmount: '' });
+                              updated[index] = { ...updated[index], farmerId: farmer.id };
+                              set('farmers', updated);
+                              setOpenFarmerRow(null);
+                            }} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 10, padding: '10px 12px', border: 0, background: 'transparent', textAlign: 'left', cursor: 'pointer' }}>
+                              <Avatar name={farmer.name} size="sm" />
+                              <span><span style={{ display: 'block' }}>{farmer.name}</span><span className="cell-sub">{farmer.farmingCategory || farmer.cropType || 'Category not set'}</span></span>
+                            </button>
+                          ))}
+                          {farmers.length === 0 && <div className="muted small" style={{ padding: 12 }}>No farmers available.</div>}
+                        </div>}
+                      </div>
+                      <label className="field">
+                        <span className="field__label">Amount to invest</span>
+                        <input className={cx('input', errors[`farmer:${allocation.farmerId}:amount`] && 'input--error')} aria-invalid={Boolean(errors[`farmer:${allocation.farmerId}:amount`])} aria-label={`Investment amount for ${selectedFarmer?.name || 'farmer'}`} type="number" min="1" placeholder="Enter amount" value={allocation.allocatedAmount} onChange={(e) => {
+                          const updated = [...form.farmers];
+                          if (!updated.length) updated.push({ farmerId: '', allocatedAmount: '' });
+                          updated[index] = { ...updated[index], allocatedAmount: e.target.value };
+                          set('farmers', updated);
+                        }} />
+                        {errors[`farmer:${allocation.farmerId}:amount`] && <span className="field__error">{errors[`farmer:${allocation.farmerId}:amount`]}</span>}
+                      </label>
+                      {form.farmers.length > 0 && <Button variant="danger-outline" size="sm" onClick={() => set('farmers', form.farmers.filter((_, i) => i !== index))} style={{ gridColumn: '1 / -1', justifySelf: 'end' }}><Trash2 size={15} />Remove farmer</Button>}
+                    </div>
                   );
                 })}
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}><Button variant="outline-green" size="sm" onClick={() => set('farmers', [...form.farmers, { farmerId: '', allocatedAmount: '' }])}><Plus size={16} />Add farmer</Button></div>
               </div>
             )}
           </Field>
-          {regions && <p className="small muted" style={{ marginTop: 8 }}>Regions covered: <strong>{regions}</strong></p>}
         </div>
 
         <TextField label="Start Date" required type="date" {...inputProps(form, set, 'startDate')} error={errors.startDate} />
@@ -88,14 +112,13 @@ export function DetailsStep({ form, set, errors, setBudget, clearError }) {
           <TextField label="Expected Duration" readOnly value={duration} placeholder="Set in Package Basics" hint={months ? 'Taken from your tenure and dates in Package Basics.' : 'Taken from the tenure in Package Basics.'} />
           <TextField label="Expected ROI (estimate, %)" required type="number" step="0.1" min={0} max={100} placeholder="18" {...inputProps(form, set, 'expectedRoiPct')} error={errors.expectedRoiPct} hint="An estimate inside your range from Package Basics. Not a promise." />
           <TextField label="Cooperative Share (%)" required type="number" step="0.1" min={0} max={50} {...inputProps(form, set, 'coopSharePct')} error={errors.coopSharePct} hint="The part of the profit your cooperative keeps." />
-          <TextAreaField className="full" optional label="Main risks and how you will reduce them" placeholder="One risk per line, for example: Drought may reduce yield. We will plant drought tolerant seed." {...inputProps(form, set, 'risks')} hint="Investors read this before they commit. Be honest about what can go wrong." />
         </div>
         <div className="mt-4"><PlainTerms terms={['roi', 'coopShare']} /></div>
       </Card>
 
       <Card tone="green">
         <SectionHead icon={<ClipboardCheck size={18} />} title="What's Included?" />
-        <p className="muted small" style={{ marginBottom: 16 }}>List every item the money will pay for. Each item needs a budget category, an amount, the person responsible and a supporting document such as a supplier quotation.</p>
+        <p className="muted small" style={{ marginBottom: 16 }}>List what the package includes and the amount for each item.</p>
         <BudgetEditor items={form.budget} onChange={setBudget} errors={errors} onClearError={clearError} />
         <div className="mt-4"><ReconPanel budget={form.budget} amount={form.amount} /></div>
         <div className="mt-4"><PlainTerms terms={['reconciliation']} /></div>
@@ -104,7 +127,7 @@ export function DetailsStep({ form, set, errors, setBudget, clearError }) {
       <Card tone="green">
         <SectionHead icon={<Landmark size={18} />} title="Funding plan" />
         <p className="muted small" style={{ marginBottom: 16 }}>Your package amount is released in four stages. The shares are set by the platform and cannot be changed for a single package. Money is released after evidence is approved, never on request alone.</p>
-        <FundingPlanTable amount={form.amount} />
+        <FundingPlanTable amount={form.amount} category={form.category} />
         <div className="mt-4"><PlainTerms terms={['tranche']} /></div>
       </Card>
     </div>
@@ -137,8 +160,7 @@ function SummaryCard({ title, onEdit, children }) {
   );
 }
 
-export function ReviewStep({ form, farms, checklist, confirmed, setConfirmed, confirmError, goTo, existingStatus, reviewerNotes }) {
-  const chosen = farms.filter((f) => form.farmIds.includes(f.id));
+export function ReviewStep({ form, checklist, confirmed, setConfirmed, confirmError, goTo, existingStatus, reviewerNotes }) {
   const total = form.budget.reduce((s, b) => s + (Number(b.amount) || 0), 0);
   const blockers = checklist.filter((c) => !c.ok);
   return (
@@ -146,7 +168,7 @@ export function ReviewStep({ form, farms, checklist, confirmed, setConfirmed, co
       {reviewerNotes && <Banner tone="warn" title="Changes requested by the reviewer">{reviewerNotes}</Banner>}
       <Card tone="green">
         <SectionHead icon="3" title="Review and submit" />
-        <p className="muted small" style={{ marginBottom: 16 }}>Check everything below. After you submit, a CollabFarm reviewer checks the budget and documents. You cannot edit the package while it is under review.</p>
+        <p className="muted small" style={{ marginBottom: 16 }}>Check everything below. After you submit, a CollabFarm reviewer checks the package details. You cannot edit the package while it is under review.</p>
         <ul className="coopb-checklist" aria-label="Submission checklist">
           {checklist.map((c) => <CheckRow key={c.id} item={c} onFix={goTo} />)}
         </ul>
@@ -156,8 +178,8 @@ export function ReviewStep({ form, farms, checklist, confirmed, setConfirmed, co
       <div className="grid-2">
         <SummaryCard title="Package" onEdit={() => goTo(0)}>
           <InfoList compact items={[
-            ['Name', form.name || '-'], ['Package type', form.tier || '-'], ['Category', form.category || '-'], ['Crop or activity', form.crop || '-'],
-            ['Season', form.season || '-'], ['Farming dates', form.startDate && form.endDate ? `${formatDate(form.startDate)} to ${formatDate(form.endDate)}` : '-'],
+            ['Name', form.name || '-'], ['Package type', form.tier || '-'], ['Category', form.category || '-'],
+            ['Farming dates', form.startDate && form.endDate ? `${formatDate(form.startDate)} to ${formatDate(form.endDate)}` : '-'],
             ['Tenure', form.tenureMonths ? `${form.tenureMonths} months` : '-'], ['Description', form.description || '-'],
           ]} />
         </SummaryCard>
@@ -171,37 +193,25 @@ export function ReviewStep({ form, farms, checklist, confirmed, setConfirmed, co
         </SummaryCard>
       </div>
 
-      <SummaryCard title="Farm locations" onEdit={() => goTo(0)}>
-        {chosen.length === 0 ? <p className="muted small">No farm selected yet.</p> : (
-          <ul className="coopb-plain-list">{chosen.map((f) => <li key={f.id}><span className="strong">{f.name}</span> <span className="muted">{f.location}, {f.areaHa} ha, {f.crop}</span></li>)}</ul>
-        )}
-      </SummaryCard>
-
       <SummaryCard title="Budget (What's Included)" onEdit={() => goTo(1)}>
         <div className="table-wrap">
           <table className="data-table" style={{ minWidth: 560 }}>
-            <thead><tr><th>Category</th><th>Item</th><th>Responsible</th><th>Document</th><th className="right">Amount</th></tr></thead>
+            <thead><tr><th>What's included</th><th className="right">Amount</th></tr></thead>
             <tbody>
               {form.budget.map((b) => (
                 <tr key={b.id}>
-                  <td>{b.category || '-'}</td><td>{b.description || '-'}</td><td>{b.responsible || '-'}</td>
-                  <td>{b.files?.length ? <span className="green strong small">{b.files[0].name}</span> : <StatusPill tone="amber">Missing</StatusPill>}</td>
-                  <td className="right nowrap">{formatNaira(b.amount)}</td>
+                  <td>{b.description || '-'}</td><td className="right nowrap">{formatNaira(b.amount)}</td>
                 </tr>
               ))}
             </tbody>
-            <tfoot><tr><td colSpan={4} className="strong">Budget total</td><td className="right strong nowrap">{formatNaira(total)}</td></tr></tfoot>
+            <tfoot><tr><td className="strong">Budget total</td><td className="right strong nowrap">{formatNaira(total)}</td></tr></tfoot>
           </table>
         </div>
         <div className="mt-4"><ReconPanel budget={form.budget} amount={form.amount} /></div>
       </SummaryCard>
 
       <SummaryCard title="Funding plan" onEdit={() => goTo(1)}>
-        <FundingPlanTable amount={form.amount} />
-      </SummaryCard>
-
-      <SummaryCard title="Risks" onEdit={() => goTo(1)}>
-        {form.risks.trim() ? <ul className="coopb-plain-list">{form.risks.split('\n').filter((l) => l.trim()).map((l) => <li key={l}>{l}</li>)}</ul> : <p className="muted small">No risks listed. The standard platform risk disclosures will still be shown to investors.</p>}
+        <FundingPlanTable amount={form.amount} category={form.category} />
       </SummaryCard>
 
       <ThreeRules />

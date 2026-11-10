@@ -1,16 +1,16 @@
 import { useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { Banknote, Sprout, RefreshCw, CircleDot, Users, HandCoins, Pencil, Send, Undo2, FilePlus2, UserPlus } from 'lucide-react';
+import { Banknote, Sprout, RefreshCw, CircleDot, Users, HandCoins, Pencil, Send, Undo2, FilePlus2 } from 'lucide-react';
 import { Breadcrumb, PageHeader, Card, CardHeader, KpiStrip, Tabs, StatusPill, Banner, EmptyState, LinkButton, Button } from '../../components/ui/index.js';
 import { Photo } from '../../components/common/Photo.jsx';
 import { useApp } from '../../context/AppContext.jsx';
 import { formatNaira, formatDate } from '../../utils/format.js';
 import { useCoop, usePackageActions } from '../../components/coopb/hooks.js';
 import { useSubmitFlow } from '../../components/coopb/SubmitFlow.jsx';
-import { EDITABLE_STATUSES, ALLOCATABLE_STATUSES, BUDGET_CHANGE_STATUSES, PHOTO_THEME } from '../../components/coopb/constants.jsx';
+import { EDITABLE_STATUSES, BUDGET_CHANGE_STATUSES, PHOTO_THEME } from '../../components/coopb/constants.jsx';
 import { agreementSummary } from '../../components/coopb/logic.js';
 import { StatusFlow, TierDot, UnverifiedBanner } from '../../components/coopb/Common.jsx';
-import { OverviewTab, BudgetTab, FundingTab, TranchesTab, AgreementsTab, AllocationTab } from '../../components/coopb/DetailTabs.jsx';
+import { OverviewTab, BudgetTab, FundingTab, TranchesTab, AgreementsTab } from '../../components/coopb/DetailTabs.jsx';
 import { BudgetChangeModal, WithdrawModal } from '../../components/coopb/Modals.jsx';
 import '../../styles/pages/coopb.css';
 
@@ -20,7 +20,6 @@ const TABS = [
   { id: 'funding', label: 'Funding and investors' },
   { id: 'tranches', label: 'Tranches' },
   { id: 'agreements', label: 'Agreements' },
-  { id: 'allocation', label: 'Allocation summary' },
 ];
 
 export default function FundingDetail() {
@@ -46,13 +45,11 @@ export default function FundingDetail() {
 
   const tab = TABS.find((t) => t.id === params.get('tab'))?.id || 'overview';
   const editable = EDITABLE_STATUSES.includes(pkg.status);
-  const canAllocate = ALLOCATABLE_STATUSES.includes(pkg.status) && verified;
   const canChange = BUDGET_CHANGE_STATUSES.includes(pkg.status);
   const openChange = openBudgetChange(pkg);
   const agreements = agreementSummary(pkg, data);
   const fundingApp = data.applications.filter((a) => a.packageId === pkg.id && a.type === 'Funding application')[0] || null;
   const tierName = pkg.tier || 'Custom';
-  const allocatedCount = data.farmers.filter((f) => f.allocationPackageId === pkg.id).length;
 
   const cells = [
     { icon: <Banknote size={20} />, label: 'Funding Amount', value: formatNaira(pkg.amount) },
@@ -120,7 +117,6 @@ export default function FundingDetail() {
           <div className="coopb-price">{formatNaira(pkg.amount)}</div>
           <p className="muted">{pkg.description}</p>
         </div>
-        {canAllocate && <LinkButton to={`/coop/funding/${pkg.id}/allocate`} size="lg"><UserPlus size={18} />{allocatedCount ? 'Edit Allocation' : 'Assign to Farmer'}</LinkButton>}
       </div>
 
       <Card>
@@ -142,7 +138,6 @@ export default function FundingDetail() {
       {tab === 'funding' && <FundingTab pkg={pkg} />}
       {tab === 'tranches' && <TranchesTab pkg={pkg} agreements={agreements} />}
       {tab === 'agreements' && <AgreementsTab pkg={pkg} agreements={agreements} />}
-      {tab === 'allocation' && <AllocationTab pkg={pkg} canAllocate={canAllocate} />}
 
       {dialog}
       <WithdrawModal open={withdrawOpen} onClose={() => setWithdrawOpen(false)} pkg={pkg} onConfirm={(reason) => withdrawPackage(pkg, reason)} />

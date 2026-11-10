@@ -104,8 +104,8 @@ export function ReconPanel({ budget, amount }) {
 }
 
 // Read-only funding plan: how the target is split into the four tranches (shared platform rule).
-export function FundingPlanTable({ amount }) {
-  const rows = trancheAmounts(amount);
+export function FundingPlanTable({ amount, category }) {
+  const rows = trancheAmounts(amount, category);
   return (
     <div className="table-wrap">
       <table className="data-table coopb-plan">

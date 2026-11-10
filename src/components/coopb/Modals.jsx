@@ -3,8 +3,7 @@ import { Link } from 'react-router-dom';
 import { Modal, Button, MoneyField, TextAreaField, Banner, InfoList, StatusPill } from '../ui/index.js';
 import { simulate } from '../../context/AppContext.jsx';
 import { formatNaira, formatDate } from '../../utils/format.js';
-import { sixAmounts } from '../../utils/rules.js';
-import { SIX_AMOUNT_HELP } from './logic.js';
+import { trancheAmounts } from './logic.js';
 
 /* Request a budget change on an approved package. Creates an application of type "Budget change". */
 export function BudgetChangeModal({ open, onClose, pkg, onSubmit }) {
@@ -93,10 +92,11 @@ export function WithdrawModal({ open, onClose, pkg, onConfirm }) {
   );
 }
 
-/* Investment detail: the six amounts with plain language. No investor contact information is shown. */
+/* Investment detail: package tranches with the next unreleased tranche highlighted. */
 export function InvestmentModal({ open, onClose, row }) {
   if (!row) return null;
-  const six = sixAmounts(row);
+  const tranches = row.tranches?.length ? row.tranches : trancheAmounts(row.pkg?.amount || 0, row.pkg?.category).map((t) => ({ ...t, status: 'Locked' }));
+  const currentTranche = tranches.find((t) => t.status !== 'Released');
   const notConfirmed = row.committed - row.confirmed;
   return (
     <Modal open={open} onClose={onClose} title="Investment details" wide white footer={(
@@ -112,19 +112,15 @@ export function InvestmentModal({ open, onClose, row }) {
           ['Expected settlement', formatDate(row.expectedSettlementDate)],
           ['Investor agreement (A)', row.agreement ? `${row.agreement.status}, ${row.agreement.version}` : 'Not on record'],
         ]} />
-        {notConfirmed > 0 ? (
-          <Banner tone="warn" title={`${formatNaira(notConfirmed)} is committed but not yet received`}>
-            A commitment is a promise to invest. Do not plan spending against it. It counts as received only after the regulated financial partner confirms the money.
-          </Banner>
-        ) : (
+        {notConfirmed <= 0 && (
           <Banner tone="success" title="Fully confirmed">The financial partner has confirmed the full committed amount. It is released to the project only in stages, after evidence is approved.</Banner>
         )}
-        <div className="coopb-six" aria-label="The six amounts">
-          {six.map((a, i) => (
-            <div key={a.key} className={`coopb-six__row${a.key === 'confirmed' ? ' coopb-six__row--key' : ''}`}>
-              <span className="coopb-six__no">{i + 1}</span>
-              <div><div className="strong small">{a.label}</div><div className="caption muted">{SIX_AMOUNT_HELP[a.key]}</div></div>
-              <div className="coopb-six__val">{formatNaira(a.value)}</div>
+        <div className="coopb-six" aria-label="Package tranches">
+          {tranches.map((tranche) => (
+            <div key={tranche.id || tranche.number} className={`coopb-six__row${tranche.number === currentTranche?.number ? ' coopb-six__row--key' : ''}`}>
+              <span className="coopb-six__no">{tranche.number}</span>
+              <div><div className="strong small">T{tranche.number} {tranche.name}</div><div className="caption muted">{tranche.purpose}</div><div className="caption muted">{tranche.status || 'Locked'}</div></div>
+              <div className="coopb-six__val">{formatNaira(tranche.amount)}</div>
             </div>
           ))}
         </div>

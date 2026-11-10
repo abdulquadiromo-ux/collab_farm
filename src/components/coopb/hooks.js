@@ -18,8 +18,23 @@ const OPEN_STAGES = ['Submitted', 'Under Review', 'Changes Requested'];
 
 // Workflow actions that touch several collections. They follow the appendix contracts in docs/BUILD_BRIEF.md.
 export function usePackageActions() {
-  const { data, add, update, notify, toast, user } = useApp();
+  const { data, add, update, patchData, notify, toast, user } = useApp();
   const coopName = data.cooperatives.find((c) => c.id === user?.orgId)?.name || 'A cooperative';
+
+  const syncPackageFarmers = (pkg) => {
+    const selected = new Map((pkg.farmers || []).map((f) => [f.farmerId, Number(f.allocatedAmount) || 0]));
+    patchData((current) => ({
+      ...current,
+      farmers: current.farmers.map((farmer) => {
+        if (selected.has(farmer.id)) {
+          const amount = selected.get(farmer.id);
+          return { ...farmer, allocationPackageId: pkg.id, allocatedAmount: amount, allocation: { ...(farmer.allocation || {}), purpose: `Package allocation: ${pkg.name}`, supportType: 'Cash', expectedDate: pkg.startDate || '', approval: 'Pending' } };
+        }
+        if (farmer.allocationPackageId === pkg.id) return { ...farmer, allocationPackageId: null, allocatedAmount: 0, allocation: null };
+        return farmer;
+      }),
+    }));
+  };
 
   // Store a package as Draft (new or existing). Returns the saved record.
   const saveDraft = (record, existing) => {
@@ -29,6 +44,7 @@ export function usePackageActions() {
     } else {
       add('packages', rec, { action: 'Funding package draft created', entityType: 'Package', summary: `${rec.name} created as Draft (${formatNaira(rec.amount)})`, reason: 'Created by cooperative' });
     }
+    syncPackageFarmers(rec);
     return rec;
   };
 
@@ -40,6 +56,7 @@ export function usePackageActions() {
     } else {
       add('packages', rec, { action: 'Funding request submitted', entityType: 'Package', summary: `${rec.name} submitted for review (${formatNaira(rec.amount)})`, reason: 'Status Draft to Submitted' });
     }
+    syncPackageFarmers(rec);
     const reopen = data.applications.find((a) => a.packageId === rec.id && a.type === 'Funding application' && a.stage === 'Changes Requested');
     let appId;
     if (reopen) {

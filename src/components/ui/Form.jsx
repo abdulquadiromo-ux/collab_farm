@@ -162,7 +162,7 @@ export function Checkbox({ checked, onChange, children, error }) {
 }
 
 // Local-only upload simulation. Files never leave the browser. onFiles receives [{name,size}]
-export function FileDrop({ label, accept = 'JPG, PNG or PDF (Max 5MB)', files = [], onFiles, multiple, error, prompt = 'Click to upload or drag and drop' }) {
+export function FileDrop({ label, required, accept = 'JPG, PNG or PDF (Max 5MB)', files = [], onFiles, multiple, error, prompt = 'Click to upload or drag and drop' }) {
   const ref = useRef(null);
   const [over, setOver] = useState(false);
   const handle = (list) => {
@@ -171,7 +171,7 @@ export function FileDrop({ label, accept = 'JPG, PNG or PDF (Max 5MB)', files = 
   };
   return (
     <div className="field">
-      {label && <span className="field__label">{label}</span>}
+      {label && <span className="field__label">{label}{required && <span className="req" aria-hidden="true">*</span>}</span>}
       <div
         className={cx('dropzone', over && 'dropzone--over')}
         role="button"

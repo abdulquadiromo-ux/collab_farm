@@ -1,6 +1,6 @@
 // Pure helpers for the cooperative funding pages (group coopb). No state, no network.
 import { newId } from '../../context/AppContext.jsx';
-import { TRANCHE_PLAN } from '../../data/funding.js';
+import { tranchePlanFor } from '../../data/funding.js';
 import { budgetReconciles, sum } from '../../utils/rules.js';
 import { formatNaira } from '../../utils/format.js';
 import { TEMPLATES, TEMPLATE_CATEGORIES, TIERS, ALL_CATEGORIES, AGREEMENT_REQUIRED_STATUSES } from './constants.jsx';
@@ -15,7 +15,7 @@ export const emptyForm = () => ({
   minInvestment: '', maxInvestment: '', minTarget: '', expectedOutput: '',
   returnLow: '', returnHigh: '',
   amount: '', expectedRoiPct: '', coopSharePct: 10, risks: '',
-  budget: [newBudgetItem()],
+  budget: [newBudgetItem()], farmers: [],
 });
 
 // Map a template inclusion label to a PRD budget category.
@@ -75,6 +75,7 @@ export function packageToForm(pkg) {
     returnLow: pkg.returnLow ?? (roi != null ? Math.max(0, roi - 2) : ''), returnHigh: pkg.returnHigh ?? (roi != null ? roi + 2 : ''),
     amount: pkg.amount ?? '', expectedRoiPct: roi ?? '', coopSharePct: pkg.coopSharePct ?? 10,
     risks: (pkg.risks || []).join('\n'), budget: budget.length ? budget : [newBudgetItem()],
+    farmers: (pkg.farmers || []).map((f) => ({ farmerId: f.farmerId || f.farmer_id || f.id, allocatedAmount: f.allocatedAmount ?? f.allocated_amount ?? '' })),
   };
 }
 
@@ -90,6 +91,28 @@ export function formToPackage(form, { coopId, existing, farms, status }) {
     responsible: String(b.responsible).trim(), docs: b.files?.[0]?.name || '', approval: 'Pending',
   }));
   const amount = Number(form.amount) || 0;
+  const apiPayload = {
+    title: form.name.trim(),
+    package_type: ({ Starter: 'STARTER', Growth: 'GROWTH', Commercial: 'COMMERCIAL', Custom: 'CUSTOM' })[form.tier] || String(form.tier || 'CUSTOM').toUpperCase(),
+    category: ({ 'Crop Farming': 'CROP_FARMING', Fishery: 'FISHERY', 'Mixed Farming': 'MIXED_FARMING', Livestock: 'LIVESTOCK', Poultry: 'POULTRY', Custom: 'CUSTOM' })[form.category] || String(form.category || 'CUSTOM').toUpperCase().replace(/\s+/g, '_'),
+    fund_amount: amount,
+    start_date: form.startDate,
+    end_date: form.endDate,
+    funding_closes_on: form.closingDate,
+    minimum_funding_target: Number(form.minTarget) || 0,
+    maximum_investment: Number(form.maxInvestment) || 0,
+    minimum_investment: Number(form.minInvestment) || 0,
+    expected_output: form.expectedOutput.trim(),
+    expected_return_min: Number(form.returnLow) || 0,
+    expected_return_max: Number(form.returnHigh) || 0,
+    farming_cycle: form.season,
+    short_description: form.description.trim(),
+    tenure_months: Number(form.tenureMonths) || 0,
+    expected_roi: Number(form.expectedRoiPct) || 0,
+    cooperative_share: Number(form.coopSharePct) || 0,
+    whats_included: budget.filter((b) => b.description).map((b) => ({ item: b.description, amount: b.amount })),
+    farmers: (form.farmers || []).filter((f) => f.farmerId).map((f) => ({ farmer_id: f.farmerId, allocated_amount: Number(f.allocatedAmount) || 0 })),
+  };
   return {
     returnStructure: 'Profit sharing (illustrative, set in agreement)',
     ...(existing || {}),
@@ -116,7 +139,7 @@ export function formToPackage(form, { coopId, existing, farms, status }) {
     coopSharePct: form.coopSharePct === '' ? 0 : Number(form.coopSharePct),
     expectedOutput: form.expectedOutput.trim(),
     status: status || existing?.status || 'Draft',
-    farmersCount: existing?.farmersCount ?? 0,
+    farmersCount: apiPayload.farmers.length,
     investorsCount: existing?.investorsCount ?? 0,
     closingDate: form.closingDate,
     startDate: form.startDate,
@@ -125,15 +148,18 @@ export function formToPackage(form, { coopId, existing, farms, status }) {
     risks: form.risks.split('\n').map((s) => s.trim()).filter(Boolean),
     inclusions: budget.filter((b) => b.description).map((b) => ({ item: b.description, amount: b.amount })),
     budget,
+    apiPayload,
+    farmers: apiPayload.farmers.map((f) => ({ farmerId: f.farmer_id, allocatedAmount: f.allocated_amount })),
   };
 }
 
 // Four tranches by the shared platform rule. The last tranche takes the rounding remainder so the total is exact.
-export function trancheAmounts(amount) {
+export function trancheAmounts(amount, category) {
   const a = Number(amount) || 0;
   let used = 0;
-  return TRANCHE_PLAN.map((t, i) => {
-    const value = i === TRANCHE_PLAN.length - 1 ? a - used : Math.round(a * t.share);
+  const plan = tranchePlanFor(category);
+  return plan.map((t, i) => {
+    const value = i === plan.length - 1 ? a - used : Math.round(a * t.share);
     used += value;
     return { ...t, amount: value };
   });
@@ -158,9 +184,6 @@ export function validateBasics(form, { platformMin = 50000 } = {}) {
   if (!form.category) e.category = 'Choose a category.';
   if (!form.tier) e.tier = 'Choose a package type.';
   if (form.description.trim().length < 30) e.description = 'Describe the package in at least 30 characters so investors understand what it funds.';
-  if (!form.crop.trim()) e.crop = 'Enter the crop or activity, for example Maize or Catfish.';
-  if (!form.farmIds.length) e.farmIds = 'Select at least one farm location.';
-  if (!form.season) e.season = 'Choose the season.';
   if (!isNum(form.tenureMonths) || !Number.isInteger(Number(form.tenureMonths)) || Number(form.tenureMonths) < 1 || Number(form.tenureMonths) > 36) e.tenureMonths = 'Enter the number of months, between 1 and 36.';
   if (!form.startDate) e.startDate = 'Choose the farming start date.';
   else if (form.startDate < today) e.startDate = 'The start date must be today or later.';
@@ -184,10 +207,8 @@ export function validateBudgetItems(items) {
   const e = {};
   if (!items.length) e.budget = 'Add at least one item to the budget.';
   items.forEach((b) => {
-    if (!b.category) e[`b:${b.id}:category`] = 'Choose a budget category.';
-    if (!String(b.description).trim()) e[`b:${b.id}:description`] = 'Describe what this item pays for.';
+    if (!String(b.description).trim()) e[`b:${b.id}:description`] = 'Enter what is included.';
     if (!isNum(b.amount) || Number(b.amount) <= 0) e[`b:${b.id}:amount`] = 'Enter an amount above zero.';
-    if (!String(b.responsible).trim()) e[`b:${b.id}:responsible`] = 'Choose who is responsible.';
   });
   return e;
 }
@@ -195,10 +216,16 @@ export function validateBudgetItems(items) {
 export function validateDetails(form) {
   const e = {};
   const amount = Number(form.amount);
+  const allocations = (form.farmers || []).filter((f) => f.farmerId);
+  allocations.forEach((f) => {
+    if (!isNum(f.allocatedAmount) || Number(f.allocatedAmount) <= 0) e[`farmer:${f.farmerId}:amount`] = 'Enter an investment amount above zero.';
+  });
+  const totalAllocated = allocations.reduce((sum, f) => sum + (Number(f.allocatedAmount) || 0), 0);
   if (!isNum(form.amount) || amount <= 0) e.amount = 'Enter the total package amount.';
   else {
     if (isNum(form.minTarget) && Number(form.minTarget) > amount) e.amount = 'The package amount cannot be lower than the minimum funding target.';
     else if (isNum(form.maxInvestment) && Number(form.maxInvestment) > amount) e.amount = 'The package amount cannot be lower than the maximum investment per investor.';
+    else if (totalAllocated > amount) e.amount = 'Farmer investment amounts cannot exceed the total package amount.';
   }
   if (!isNum(form.expectedRoiPct) || Number(form.expectedRoiPct) < 0 || Number(form.expectedRoiPct) > 100) e.expectedRoiPct = 'Enter an estimate from 0 to 100 percent.';
   else if (isNum(form.returnLow) && isNum(form.returnHigh) && (Number(form.expectedRoiPct) < Number(form.returnLow) || Number(form.expectedRoiPct) > Number(form.returnHigh))) {
@@ -214,14 +241,11 @@ export function submissionChecklist(form, { verified = true, platformMin } = {})
   const details = validateDetails(form);
   const budgetCheck = budgetReconciles({ budget: form.budget, amount: Number(form.amount) || 0 });
   const reconciles = budgetCheck.ok && budgetCheck.target > 0;
-  const docsMissing = form.budget.filter((b) => !b.files?.length).length;
   return [
     { id: 'verified', label: 'Your cooperative is verified', ok: verified, detail: verified ? '' : 'Only verified cooperatives can submit funding requests.', step: null },
     { id: 'basics', label: 'Package basics are complete', ok: !Object.keys(basics).length, detail: Object.keys(basics).length ? `${Object.keys(basics).length} field(s) need attention.` : '', step: 0 },
     { id: 'details', label: 'Funding details are complete', ok: !Object.keys(details).length, detail: Object.keys(details).length ? `${Object.keys(details).length} field(s) need attention.` : '', step: 1 },
     { id: 'reconcile', label: 'Budget reconciles with the package amount', ok: reconciles, detail: reconciles ? '' : budgetCheck.difference > 0 ? `${formatNaira(budgetCheck.difference)} of the package amount is not yet planned.` : `The budget is ${formatNaira(Math.abs(budgetCheck.difference))} over the package amount.`, step: 1 },
-    { id: 'farm', label: 'At least one farm location is selected', ok: form.farmIds.length > 0, detail: form.farmIds.length ? '' : 'Choose the farms this package will fund.', step: 0 },
-    { id: 'docs', label: 'A supporting document is attached to every budget item', ok: form.budget.length > 0 && docsMissing === 0, detail: docsMissing ? `${docsMissing} item(s) have no document yet.` : '', step: 1 },
   ];
 }
 

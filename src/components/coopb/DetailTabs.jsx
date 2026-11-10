@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom';
-import { CheckCircle2, AlertCircle, ArrowRight, FileSignature, Users } from 'lucide-react';
+import { CheckCircle2, AlertCircle, ArrowRight, FileSignature } from 'lucide-react';
 import { Card, CardHeader, InfoList, Checklist, StatusPill, EmptyState, DataTable, LinkButton, Banner, Avatar } from '../ui/index.js';
 import { useApp } from '../../context/AppContext.jsx';
 import { formatNaira, formatDate, formatDateTime, percent } from '../../utils/format.js';
-import { budgetReconciles, canReleaseTranche, packageFunding, sixAmounts, allocationCheck } from '../../utils/rules.js';
+import { budgetReconciles, canReleaseTranche, packageFunding, sixAmounts } from '../../utils/rules.js';
 import { EDITABLE_STATUSES } from './constants.jsx';
 import { ThreeRules, PlainTerms, ReconPanel, MoneyStat } from './Common.jsx';
 import { aggregateInvestments, SIX_AMOUNT_HELP, trancheAmounts } from './logic.js';
@@ -13,8 +13,10 @@ export const itemApproval = (pkg, b) => (PRE_APPROVAL.includes(pkg.status) ? 'Pe
 
 /* ---------------------------------------------------------------- Overview */
 export function OverviewTab({ pkg, farms }) {
+  const { data } = useApp();
   const items = (pkg.inclusions?.length ? pkg.inclusions.map((i) => i.item) : (pkg.budget || []).map((b) => b.description)).filter(Boolean);
   const chosen = farms.filter((f) => (pkg.farmIds || []).includes(f.id));
+  const allocatedFarmers = data.farmers.filter((f) => f.allocationPackageId === pkg.id);
   const range = pkg.returnLow || pkg.returnHigh ? `${pkg.returnLow}% to ${pkg.returnHigh}%` : null;
   return (
     <div className="stack-lg">
@@ -44,6 +46,13 @@ export function OverviewTab({ pkg, farms }) {
               <hr className="divider" />
               <div className="strong small" style={{ marginBottom: 8 }}>Farm locations</div>
               <ul className="coopb-plain-list">{chosen.map((f) => <li key={f.id}>{f.name}, {f.location} ({f.areaHa} ha)</li>)}</ul>
+            </>
+          )}
+          {allocatedFarmers.length > 0 && (
+            <>
+              <hr className="divider" />
+              <div className="strong small" style={{ marginBottom: 8 }}>Farmers and investment amounts</div>
+              <ul className="coopb-plain-list">{allocatedFarmers.map((f) => <li key={f.id}><span className="strong">{f.name}</span> <span className="muted">({f.farmingCategory || f.cropType || 'Category not set'}) — {formatNaira(f.allocatedAmount)}</span></li>)}</ul>
             </>
           )}
         </Card>
@@ -176,7 +185,7 @@ export function TranchesTab({ pkg, agreements }) {
   const real = data.tranches.filter((t) => t.packageId === pkg.id).sort((a, b) => a.number - b.number);
   const projected = real.length === 0;
   const rows = projected
-    ? trancheAmounts(pkg.amount).map((t) => ({ id: `${pkg.id}-plan-${t.number}`, packageId: pkg.id, number: t.number, name: t.name, purpose: t.purpose, conditions: t.conditions, amount: t.amount, status: 'Locked' }))
+    ? trancheAmounts(pkg.amount, pkg.category).map((t) => ({ id: `${pkg.id}-plan-${t.number}`, packageId: pkg.id, number: t.number, name: t.name, purpose: t.purpose, conditions: t.conditions, amount: t.amount, status: 'Locked' }))
     : real;
   const nextIdx = rows.findIndex((t) => t.status !== 'Released');
   return (
@@ -285,43 +294,8 @@ export function AgreementsTab({ pkg, agreements }) {
         <h2>Agreement C: Farmer Participation Agreement</h2>
         <p className="muted small">Every allocated farmer must sign before funds are released to or for them.</p>
       </div>
-      <DataTable columns={cCols} rows={c} rowKey={(r) => r.farmer.id} pageSize={8} totalLabel="farmers" emptyTitle="No farmers allocated yet" emptyText="Allocate farmers first. Their agreements are tracked here." emptyAction={<LinkButton to={`/coop/funding/${pkg.id}/allocate`} size="sm">Allocate farmers</LinkButton>} />
+      <DataTable columns={cCols} rows={c} rowKey={(r) => r.farmer.id} pageSize={8} totalLabel="farmers" emptyTitle="No farmers allocated yet" emptyText="Add farmers and their investment amounts while creating the package. Their agreements are tracked here." />
     </div>
   );
 }
 
-/* ------------------------------------------------------ Allocation summary */
-export function AllocationTab({ pkg, canAllocate }) {
-  const { data } = useApp();
-  const rows = data.farmers.filter((f) => f.allocationPackageId === pkg.id);
-  const check = allocationCheck(pkg, rows.map((f) => ({ farmerId: f.id, amount: f.allocatedAmount })));
-  const cash = rows.filter((f) => (f.allocation?.supportType || 'Cash') === 'Cash').reduce((s, f) => s + (f.allocatedAmount || 0), 0);
-  const inKind = check.total - cash;
-  const columns = [
-    { key: 'name', header: 'Farmer', render: (f) => <span className="cell-person"><Avatar name={f.name} size="sm" />{f.name}</span> },
-    { key: 'cropType', header: 'Crop' },
-    { key: 'purpose', header: 'Purpose', render: (f) => f.allocation?.purpose || '-' },
-    { key: 'type', header: 'Support', render: (f) => f.allocation?.supportType || 'Cash' },
-    { key: 'allocatedAmount', header: 'Amount', render: (f) => <span className="nowrap">{formatNaira(f.allocatedAmount)}</span> },
-    { key: 'identityStatus', header: 'Identity', render: (f) => <StatusPill>{f.identityStatus}</StatusPill> },
-    { key: 'agreementStatus', header: 'Agreement C', render: (f) => <StatusPill>{f.agreementStatus}</StatusPill> },
-  ];
-  return (
-    <div className="stack-lg">
-      {check.overBudget && <Banner tone="danger" title="Allocations exceed the package budget">The farmers below are allocated {formatNaira(check.total)} but the budget is {formatNaira(pkg.amount)}. Reduce allocations by {formatNaira(check.total - pkg.amount)} before the package can move on.</Banner>}
-      <Card>
-        <div className="coopb-stat-grid">
-          <MoneyStat label="Package budget" value={formatNaira(pkg.amount)} />
-          <MoneyStat tone={check.overBudget ? 'amber' : 'green'} label="Total allocated" value={formatNaira(check.total)} sub={`Cash ${formatNaira(cash)} . In-kind ${formatNaira(inKind)}`} />
-          <MoneyStat label={check.overBudget ? 'Over budget by' : 'Remaining to allocate'} value={formatNaira(Math.abs(check.remaining))} sub={`${rows.length} farmer${rows.length === 1 ? '' : 's'} allocated`} />
-        </div>
-        <div className="row mt-4">
-          {canAllocate
-            ? <LinkButton to={`/coop/funding/${pkg.id}/allocate`}><Users size={18} />{rows.length ? 'Edit allocation' : 'Allocate to farmers'}</LinkButton>
-            : <span className="small muted">Allocation can be changed while a package is Draft, Changes Requested, Approved or Open for Funding.</span>}
-        </div>
-      </Card>
-      <DataTable columns={columns} rows={rows} pageSize={8} totalLabel="farmers" emptyTitle="No farmers allocated yet" emptyText="Share the approved budget between your verified farmers." />
-    </div>
-  );
-}

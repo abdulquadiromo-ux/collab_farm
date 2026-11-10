@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Eye, Pencil, Send, Copy, Plus } from 'lucide-react';
+import { ArrowRight, Eye, Pencil, Send, Copy, Plus } from 'lucide-react';
 import { DataTable, StatusPill, KebabMenu, LinkButton, Button } from '../ui/index.js';
 import { formatNaira, formatDate, formatNumber } from '../../utils/format.js';
 import { EDITABLE_STATUSES } from './constants.jsx';
@@ -42,7 +42,7 @@ export default function PackagesTable({ rows, verified, emptyTitle, emptyText, e
         if (verified) items.push({ label: 'Duplicate as draft', icon: <Copy size={16} />, onClick: () => duplicateAsDraft(p) });
         return (
           <div className="row" style={{ gap: 8 }}>
-            <LinkButton to={`/coop/funding/${p.id}`} variant="outline" size="sm" aria-label={`View ${p.name}`}>View</LinkButton>
+            <LinkButton to={`/coop/funding/${p.id}`} variant="primary" size="sm" className="coopb-view-package" aria-label={`View package ${p.name}`}>View Package <ArrowRight size={16} /></LinkButton>
             <KebabMenu items={items} label={`More actions for ${p.name}`} />
           </div>
         );
@@ -77,7 +77,7 @@ export default function PackagesTable({ rows, verified, emptyTitle, emptyText, e
   );
 }
 
-export function CreatePackageButton({ verified, size = 'lg', children = 'Create Custom Package' }) {
+export function CreatePackageButton({ verified, size = 'lg', children = 'Create Package' }) {
   const sz = size === 'md' ? undefined : size;
   if (!verified) {
     return <Button size={sz} disabled title="Available once your cooperative is verified"><Plus size={20} />{children}</Button>;

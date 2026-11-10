@@ -1,14 +1,14 @@
 import { Sprout, Fish, Layers, Beef, Bird } from 'lucide-react';
 import { PACKAGE_TEMPLATES, CATEGORIES } from '../../data/funding.js';
 
-// Funding category tabs (Figma 7046:17354). The Custom tab has no icon in the design.
+// Funding category tabs. Custom packages are included in All.
 export const FUNDING_TABS = [
+  { id: 'all', label: 'All', category: null, icon: null },
   { id: 'crop-farming', label: 'Crop Farming', category: 'Crop Farming', icon: <Sprout size={26} strokeWidth={1.5} /> },
   { id: 'fishery', label: 'Fishery', category: 'Fishery', icon: <Fish size={26} strokeWidth={1.5} /> },
   { id: 'mixed-farming', label: 'Mixed Farming', category: 'Mixed Farming', icon: <Layers size={26} strokeWidth={1.5} /> },
   { id: 'livestock', label: 'Livestock', category: 'Livestock', icon: <Beef size={26} strokeWidth={1.5} /> },
   { id: 'poultry', label: 'Poultry', category: 'Poultry', icon: <Bird size={26} strokeWidth={1.5} /> },
-  { id: 'custom', label: 'Custom', category: 'Custom', icon: null },
 ];
 
 export const CATEGORY_ICON_LARGE = {
