@@ -187,6 +187,9 @@ img { max-width: 100%; display: block; }
 .toggle input:checked ~ .toggle__thumb { transform: translateX(20px); }
 .toggle input:focus-visible ~ .toggle__track { box-shadow: var(--focus); }
 .setting-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); padding: var(--s-3) 0; }
+.shr-settings .setting-row { min-height: 68px; margin: 0 var(--s-5); padding: var(--s-3) var(--s-3); border-top: 1px solid var(--grey-200); }
+.shr-settings .setting-row > div { min-width: 0; }
+.shr-settings .setting-row .toggle { flex: none; }
 
 /* ---------- tabs ---------- */
 .tabs { display: flex; border-bottom: 1px solid var(--grey-400); }

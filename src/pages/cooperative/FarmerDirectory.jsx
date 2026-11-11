@@ -9,7 +9,7 @@ import { formatDate, formatTime } from '../../utils/format.js';
 import { UnverifiedBanner } from '../../components/coopa/Bits.jsx';
 import { BulkUploadModal } from '../../components/coopa/BulkUploadModal.jsx';
 import { RemoveFarmerModal } from '../../components/coopa/RemoveFarmerModal.jsx';
-import { downloadCsv, farmSizeLabel, maskNin, toCsv, useCoop } from '../../components/coopa/helpers.js';
+import { downloadCsv, maskNin, toCsv, useCoop } from '../../components/coopa/helpers.js';
 import '../../styles/pages/coopa.css';
 
 const PAGE_SIZE = 10;
@@ -70,8 +70,8 @@ export default function FarmerDirectory() {
   const filtersOn = Boolean(q || crop || status || sort);
 
   const exportCsv = () => {
-    const header = ['Name', 'Crop type', 'Farm size', 'Phone', 'NIN (last 4 digits)', 'Status', 'Identity status', 'Agreement status', 'Date added'];
-    const body = filtered.map((f) => [f.name, f.cropType, farmSizeLabel(f), f.phone, maskNin(f.nin).slice(-4), f.status, f.identityStatus, f.agreementStatus, String(f.dateAdded).slice(0, 10)]);
+    const header = ['Name', 'Crop type', 'Number of farms', 'Phone', 'NIN (last 4 digits)', 'Status', 'Date added'];
+    const body = filtered.map((f) => [f.name, f.cropType, Array.isArray(f.farmIds) ? f.farmIds.length : f.farmId ? 1 : 0, f.phone, maskNin(f.nin).slice(-4), f.status, String(f.dateAdded).slice(0, 10)]);
     downloadCsv('farmers.csv', toCsv([header, ...body]));
     toast(`Exported ${filtered.length} ${filtered.length === 1 ? 'farmer' : 'farmers'} to farmers.csv.`, 'success');
   };
@@ -84,11 +84,9 @@ export default function FarmerDirectory() {
   const columns = [
     { key: 'name', header: 'Farmer', render: (f) => <div className="cell-person"><Avatar name={f.name} /><Link to={`/coop/farmers/${f.id}`} className="coopa-name">{f.name}</Link></div> },
     { key: 'cropType', header: 'Crop type' },
-    { key: 'farmSize', header: 'Farm size', render: (f) => <span className="nowrap">{farmSizeLabel(f)}</span> },
+    { key: 'farmCount', header: 'Number of farms', render: (f) => <span className="nowrap">{Array.isArray(f.farmIds) ? f.farmIds.length : f.farmId ? 1 : 0}</span> },
     { key: 'phone', header: 'Phone number', render: (f) => <span className="nowrap">{f.phone}</span> },
     { key: 'status', header: 'Status', render: (f) => <StatusPill>{f.status}</StatusPill> },
-    { key: 'identityStatus', header: 'Identity', render: (f) => <StatusPill>{f.identityStatus}</StatusPill> },
-    { key: 'agreementStatus', header: 'Agreement', render: (f) => <StatusPill>{f.agreementStatus}</StatusPill> },
     { key: 'dateAdded', header: 'Date added', render: (f) => <div className="nowrap">{formatDate(f.dateAdded)}<div className="cell-sub">{formatTime(f.dateAdded)}</div></div> },
     {
       key: 'actions',

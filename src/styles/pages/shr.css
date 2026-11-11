@@ -164,7 +164,7 @@
 /* ---------- settings ---------- */
 .shr-settings__tabs { overflow-x: auto; scrollbar-width: thin; }
 .shr-settings__tabs .tabs { min-width: max-content; }
-.shr-settings__body { max-width: 980px; }
+.shr-settings__body { max-width: none; }
 .shr-profile-head { display: flex; align-items: center; gap: var(--s-4); margin-bottom: var(--s-4); flex-wrap: wrap; }
 .shr-profile-head__action { margin-left: auto; }
 .shr-savebar { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }

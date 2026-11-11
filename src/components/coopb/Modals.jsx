@@ -110,7 +110,6 @@ export function InvestmentModal({ open, onClose, row }) {
           ['Reference', row.ref], ['Package', row.pkg?.name], ['Investor', row.investorName],
           ['Status', <StatusPill key="s">{row.status}</StatusPill>], ['Date committed', formatDate(row.dateInvested)],
           ['Expected settlement', formatDate(row.expectedSettlementDate)],
-          ['Investor agreement (A)', row.agreement ? `${row.agreement.status}, ${row.agreement.version}` : 'Not on record'],
         ]} />
         {notConfirmed <= 0 && (
           <Banner tone="success" title="Fully confirmed">The financial partner has confirmed the full committed amount. It is released to the project only in stages, after evidence is approved.</Banner>

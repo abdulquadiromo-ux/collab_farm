@@ -115,7 +115,8 @@
 .coopb-six__row { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: var(--s-3); padding: 14px 16px; border-bottom: 1px solid var(--grey-200); align-items: start; }
 .coopb-six__row:last-child { border-bottom: 0; }
 .coopb-six__no { width: 24px; height: 24px; border-radius: 50%; background: var(--primary-50); color: var(--primary-500); font-size: 12px; font-weight: 700; display: grid; place-items: center; }
-.coopb-six__row--key { background: #f3fbf6; }
+.coopb-six__row--key { background: #edf7f0; box-shadow: inset 4px 0 0 var(--green-600); }
+.coopb-six__row--key .coopb-six__no { background: var(--green-600); color: var(--white); }
 .coopb-six__val { font-weight: 600; white-space: nowrap; }
 
 /* ---------- Allocation ---------- */

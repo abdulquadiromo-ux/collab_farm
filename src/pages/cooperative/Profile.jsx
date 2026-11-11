@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Building2, Landmark, Pencil, Plus, ShieldCheck, Trash2, Upload, UserPlus, Users } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
+import { Building2, Landmark, ShieldCheck, Trash2, Upload, UserPlus, Users } from 'lucide-react';
 import {
   Avatar, Banner, Button, Card, ConfirmDialog, DataTable, EmptyState, InfoList, LinkButton, Modal, PageHeader, PageSkeleton, Progress, SectionHead, SelectField, StatusPill, TextField,
 } from '../../components/ui/index.js';
@@ -194,27 +194,8 @@ export default function Profile() {
       </Card>
 
       <Card className="coopa-profile-org">
-        <SectionHead icon={<Building2 size={18} />} title="Organisation details" right={editing !== 'org' && <Button variant="outline-green" size="sm" onClick={startOrg} disabled={Boolean(editing)}><Pencil size={16} />Edit</Button>} />
-        {editing === 'org' && org ? (
-          <div className="stack">
-            <div className="form-grid">
-              <TextField label="Cooperative name" required value={org.name} onChange={setO('name')} error={orgErr.name} />
-              <TextField label="Registration number" required value={org.regNumber} onChange={setO('regNumber')} error={orgErr.regNumber} />
-              <TextField label="Year established" required inputMode="numeric" maxLength={4} value={org.yearEstablished} onChange={setO('yearEstablished')} error={orgErr.yearEstablished} />
-              <TextField label="Official email address" required type="email" value={org.email} onChange={setO('email')} error={orgErr.email} />
-              <TextField label="Phone number" required type="tel" value={org.phone} onChange={setO('phone')} error={orgErr.phone} />
-              <TextField label="State" required value={org.state} onChange={setO('state')} error={orgErr.state} />
-              <TextField label="Local government area" required value={org.lga} onChange={setO('lga')} error={orgErr.lga} />
-              <TextField className="full" label="Office address" required value={org.address} onChange={setO('address')} error={orgErr.address} />
-            </div>
-            <Banner tone="info">If you change the cooperative name or registration number, a reviewer is asked to re-check it against your certificate.</Banner>
-            <div className="row-wrap" style={{ justifyContent: 'flex-end' }}>
-              <Button variant="outline" onClick={() => setEditing(null)} disabled={busy}>Cancel</Button>
-              <Button onClick={saveOrg} loading={busy}>Save changes</Button>
-            </div>
-          </div>
-        ) : (
-          <InfoList items={[
+        <SectionHead icon={<Building2 size={18} />} title="Organisation details" />
+        <InfoList items={[
             ['Cooperative name', coop.name],
             ['Registration number', coop.regNumber],
             ['Year established', coop.yearEstablished],
@@ -224,109 +205,15 @@ export default function Profile() {
             ['State', coop.state],
             ['Local government area', coop.lga],
             ['Office address', coop.address],
-          ]}
-          />
-        )}
-      </Card>
-
-      <div className="grid-2 coopa-profile-pair">
-        <Card>
-          <SectionHead icon={<Users size={18} />} title="Authorised representatives" right={<Button variant="outline-green" size="sm" onClick={() => setAddingRep(true)}><UserPlus size={16} />Add</Button>} />
-          <p className="caption muted" style={{ marginBottom: 8 }}>People who can sign agreements and confirm evidence for your cooperative. At least one is required.</p>
-          {reps.length === 0 ? (
-            <EmptyState icon={<Users size={28} />} title="No representatives listed" action={<Button size="sm" onClick={() => setAddingRep(true)}><Plus size={16} />Add representative</Button>}>Add the chairperson or secretary so agreements can be signed.</EmptyState>
-          ) : (
-            <ul className="coopa-reps">
-              {reps.map((r) => {
-                const me = r.name === user?.name;
-                return (
-                  <li key={r.name} className="coopa-rep">
-                    <Avatar name={r.name} />
-                    <div className="grow"><div className="strong small">{r.name}{me && <span className="chip coopa-skill" style={{ marginLeft: 8 }}>You</span>}</div><div className="cell-sub">{r.role}</div></div>
-                    <button type="button" className="kebab" aria-label={`Remove ${r.name}`} disabled={me || reps.length === 1} title={me ? 'You cannot remove yourself' : reps.length === 1 ? 'At least one representative is required' : `Remove ${r.name}`} onClick={() => setRemovingRep(r)}><Trash2 size={16} /></button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </Card>
-
-        <Card>
-          <SectionHead icon={<Landmark size={18} />} title="Payout account" right={editing !== 'bank' && <Button variant="outline-green" size="sm" onClick={startBank} disabled={Boolean(editing)}><Pencil size={16} />Edit</Button>} />
-          <Banner tone="green" className="coopa-hold">CollabFarm does not hold or pool money. A regulated financial partner pays approved amounts into this account. Enter the full 10-digit account number; this demo retains only its last 4 digits. Bank account-name lookup is not connected.</Banner>
-          {editing === 'bank' ? (
-            <div className="stack" style={{ marginTop: 16 }}>
-              <TextField label="Account name" value={coop.name} readOnly hint="Filled from your cooperative profile. This is not verified against the bank." />
-              <SelectField label="Bank name" required placeholder="Choose bank" options={BANKS} value={bank.name} onChange={(e) => { setBank((s) => ({ ...s, name: e.target.value })); if (bankErr.name) setBankErr((s) => ({ ...s, name: '' })); }} error={bankErr.name} />
-              <TextField label="Account number" required inputMode="numeric" maxLength={10} autoComplete="off" value={bank.number} placeholder="10-digit account number" onChange={(e) => { setBank((s) => ({ ...s, number: e.target.value.replace(/\D/g, '').slice(0, 10) })); if (bankErr.number) setBankErr((s) => ({ ...s, number: '' })); }} error={bankErr.number} hint="Enter all 10 digits. Only the last 4 are retained in this demo." />
-              <Banner tone="warn">A reviewer confirms a new payout account before any payment is made to it.</Banner>
-              <div className="row-wrap" style={{ justifyContent: 'flex-end' }}>
-                <Button variant="outline" onClick={() => setEditing(null)} disabled={busy}>Cancel</Button>
-                <Button onClick={saveBank} loading={busy}>Save account</Button>
-              </div>
-            </div>
-          ) : (
-            <InfoList compact items={[
+        ]} />
+        <SectionHead icon={<Landmark size={18} />} title="Payout account" />
+          <InfoList compact items={[
               ['Bank name', bankInfo.name || '-'],
               ['Account name', bankInfo.accountName || coop.name],
               ['Account number', bankInfo.last4 ? <span key="n" className="nowrap" aria-label={`Account ending ${bankInfo.last4}`}>{'•••• •••• '}{bankInfo.last4}</span> : 'Not added yet'],
-            ]}
-            />
-          )}
-        </Card>
-      </div>
-
-      <Card id="verification" className="coopa-verification">
-        <SectionHead icon={<ShieldCheck size={18} />} title="Verification status" right={<Button size="sm" onClick={() => setUpload({ doc: null, type: COOP_DOC_TYPES[0] })}><Upload size={16} />Upload document</Button>} />
-        <div className="coopa-verif">
-          <div className="coopa-verif__status">
-            <StatusPill tone={verified ? 'green' : 'amber'}>{coop.status}</StatusPill>
-            <p className="small">{STATUS_TEXT[coop.status] || 'Check the verification status page for the latest update.'}</p>
-            <Link to="/onboarding/status" className="small strong">View verification status</Link>
-          </div>
-          <div className="coopa-verif__progress">
-            <div className="row between small"><span>Documents verified</span><strong>{verifiedDocs} of {docs.length}</strong></div>
-            <Progress value={docs.length ? (verifiedDocs / docs.length) * 100 : 0} label="Documents verified" tone="dark" />
-          </div>
-        </div>
-        <DocLegend />
-        <DataTable
-          bare hideFooter pageSize={50} rows={docs}
-          emptyTitle="No documents uploaded yet"
-          emptyText="Upload your registration certificate, proof of address and leadership identification so a reviewer can verify your cooperative."
-          emptyAction={<Button size="sm" onClick={() => setUpload({ doc: null, type: COOP_DOC_TYPES[0] })}><Upload size={16} />Upload document</Button>}
-          columns={[
-            { key: 'type', header: 'Document', render: (d) => <span className="strong">{d.type}</span> },
-            { key: 'file', header: 'File', render: (d) => <span className="cell-sub">{d.file}</span> },
-            { key: 'status', header: 'Status', render: (d) => <DocStatusPill status={d.status} /> },
-            { key: 'reviewer', header: 'Checked by', render: (d) => (d.reviewer ? <div>{d.reviewer}<div className="cell-sub">{d.reviewedAt ? formatDateShort(d.reviewedAt) : ''}</div></div> : <span className="muted">Not checked yet</span>) },
-            { key: 'actions', header: 'Actions', render: (d) => (d.status === 'Verified' ? <span className="caption muted">Locked after verification</span> : <Button variant="outline-green" size="sm" onClick={() => setUpload({ doc: d, type: d.type })}>Replace file</Button>) },
-          ]}
-        />
+          ]} />
       </Card>
 
-      <RepModal open={addingRep} onClose={() => setAddingRep(false)} existing={reps} onSave={addRep} />
-      <ConfirmDialog
-        open={Boolean(removingRep)}
-        onClose={() => !busy && setRemovingRep(null)}
-        onConfirm={removeRep}
-        loading={busy}
-        title="Remove this representative?"
-        message="They will no longer be able to sign agreements for your cooperative. Agreements they already signed stay valid."
-        summary={removingRep ? [['Name', removingRep.name], ['Role', removingRep.role]] : undefined}
-        confirmLabel="Remove representative"
-      />
-      <UploadDocumentModal
-        open={Boolean(upload)}
-        onClose={() => setUpload(null)}
-        title={upload?.doc ? 'Replace document file' : 'Upload document'}
-        intro={upload?.doc ? `Upload a new file for ${upload.doc.type}. It goes back to Uploaded until a reviewer checks it.` : 'Upload a document so a CollabFarm reviewer can verify your cooperative.'}
-        typeOptions={COOP_DOC_TYPES}
-        defaultType={upload?.type}
-        lockType={Boolean(upload?.doc)}
-        submitLabel={upload?.doc ? 'Replace file' : 'Upload document'}
-        onSubmit={saveDocument}
-      />
     </div>
   );
 }

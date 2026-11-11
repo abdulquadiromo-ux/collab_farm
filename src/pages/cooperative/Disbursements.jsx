@@ -8,6 +8,7 @@ import { useCoop, daysFromToday, sumBy, trancheShort } from '../../components/co
 import { formatNaira, formatDate } from '../../utils/format.js';
 import { trancheAmounts } from '../../components/coopb/logic.js';
 import '../../styles/pages/coopc.css';
+import '../../styles/pages/coopb.css';
 
 const STATUS_OPTIONS = ['Disbursed', 'Reviewing', 'Pending', 'Rejected'];
 const PERIODS = [
@@ -139,10 +140,9 @@ export default function Disbursements() {
           <InfoList compact items={[
             ['Reference', selected.ref],
             ['Package', selected.pkgName],
-            ['Recipient', `${selected.recipientName} (${selected.recipientType})`],
             ['Status', <StatusPill key="status">{selected.status}</StatusPill>],
-            [done ? 'Amount disbursed' : 'Amount requested', formatNaira(selected.amount)],
-            [done ? 'Date disbursed' : 'Date requested', formatDate(selected.date)],
+            ['Disbursement amount', formatNaira(selected.amount)],
+            ['Disbursement date', formatDate(selected.date)],
             ['Package category', selected.pkgCategory || '-'],
           ]} />
           <div className="coopb-six" aria-label="Package tranches">

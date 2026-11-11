@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, Download, KeyRound, LogOut, Monitor, Smartphone, UserX, X } from 'lucide-react';
+import { Check, Download, KeyRound, Monitor, Smartphone, UserX, X } from 'lucide-react';
 import { useApp, simulate } from '../../context/AppContext.jsx';
-import { Avatar, Banner, Button, Card, CardHeader, ConfirmDialog, InfoList, Modal, PasswordField, SelectField, SettingRow, StatusPill, Toggle } from '../ui/index.js';
+import { Avatar, Banner, Button, Card, CardHeader, ConfirmDialog, InfoList, Modal, PasswordField, SelectField, SettingRow, StatusPill } from '../ui/index.js';
 import { RolePill } from './ShrBits.jsx';
 import { baseFor, byId, canSeeComplaint, contractsForUser, downloadFile, isoNow, mergeUserPrefs, userPrefs, whenLabel } from './shrUtils.js';
 import { NAIRA, formatDate, formatDateShort, formatNaira } from '../../utils/format.js';
@@ -97,9 +97,12 @@ export function NotificationSettings() {
   const [draft, setDraft] = useState(initial);
   const [saving, setSaving] = useState(false);
   const dirty = !same(draft, initial);
-  const big = role === 'farmer';
 
-  const setDigest = (k) => (v) => setDraft((d) => ({ ...d, digest: { ...d.digest, [k]: v } }));
+  const setDigest = (k) => async (v) => {
+    const next = { ...draft, digest: { ...draft.digest, [k]: v } };
+    setDraft(next);
+    await save({ notifications: next }, { action: 'Updated notification preferences', summary: `Changed ${k} email notifications` }, 'Notification settings saved');
+  };
   const setGroup = (g, k, v) => setDraft((d) => ({ ...d, groups: { ...d.groups, [g]: { ...d.groups[g], [k]: v } } }));
   const doSave = async () => {
     setSaving(true);
@@ -110,34 +113,17 @@ export function NotificationSettings() {
 
   return (
     <div className="stack-lg">
-      <Card>
-        <CardHeader title="Email notifications" subtitle="Get emails to find out what is going on when you are not online. You can turn these off." />
-        <SettingRow title="News and updates" description="News about CollabFarm Finance and feature updates." checked={draft.digest.news} onChange={setDigest('news')} />
-        <SettingRow title="Reminders" description="Reminders about deadlines, signing and reports." checked={draft.digest.reminders} onChange={setDigest('reminders')} />
-        <SettingRow title="More activity about you" description="Activity on your packages, payments and complaints." checked={draft.digest.activity} onChange={setDigest('activity')} />
-      </Card>
-
       <Card pad={false}>
-        <div style={{ padding: 'var(--s-6) var(--s-6) var(--s-2)' }}>
-          <CardHeader title={big ? 'What do you want to hear about?' : 'Choose how you hear about each event'} subtitle="In-app messages appear in the bell and on the Notifications page. In-app messages about verification and your account are always on." />
+        <div style={{ padding: 'var(--s-5) var(--s-6)', borderBottom: '1px solid var(--grey-200)' }}>
+          <h2 style={{ margin: 0, fontSize: 18 }}>Notification Settings</h2>
         </div>
-        <div className="shr-notif-grid" role="table" aria-label="Notification settings by event group">
-          <div className="shr-notif-grid__head" role="row"><span role="columnheader">Event</span><span role="columnheader">In-app</span><span role="columnheader">Email</span></div>
-          {ids.map((g) => (
-            <div className="shr-notif-grid__row" role="row" key={g}>
-              <div role="cell"><div className="strong small">{GROUPS[g].title}</div><div className="caption muted">{GROUPS[g].desc}</div></div>
-              <div role="cell" className="shr-notif-grid__cell">
-                {GROUPS[g].locked
-                  ? <span className="chip" style={{ background: 'var(--primary-50)', color: 'var(--primary-700)' }}>Always on</span>
-                  : <Toggle checked={draft.groups[g].inApp} onChange={(v) => setGroup(g, 'inApp', v)} label={`${GROUPS[g].title}, in-app`} />}
-              </div>
-              <div role="cell" className="shr-notif-grid__cell"><Toggle checked={draft.groups[g].email} onChange={(v) => setGroup(g, 'email', v)} label={`${GROUPS[g].title}, email`} /></div>
-            </div>
-          ))}
+        <div className="shr-setrow">
+          <div><div className="strong">Email Notifications</div><div className="small muted">Choose which updates you would like to receive in your inbox.</div></div>
         </div>
+        <SettingRow title="News & Updates" description="News about CollabFarm and new platform features." checked={draft.digest.news} onChange={setDigest('news')} />
+        <SettingRow title="Reminders" description="Helpful reminders about important dates and tasks on your account." checked={draft.digest.reminders} onChange={setDigest('reminders')} />
+        <SettingRow title="Account Activity" description="Notifications about important activity on your account." checked={draft.digest.activity} onChange={setDigest('activity')} />
       </Card>
-      <p className="small muted">Emails never contain passwords, one-time codes or identity documents. In this demo no email is sent.</p>
-      <SaveBar dirty={dirty} saving={saving} onSave={doSave} onReset={() => setDraft(initial)} />
     </div>
   );
 }
@@ -201,20 +187,9 @@ export function SecuritySettings() {
   const { data, user, role, audit, notify, toast, patchData } = useApp();
   const prefs = userPrefs(data, user.id);
   const [pw, setPw] = useState(false);
-  const [signOutAsk, setSignOutAsk] = useState(false);
   const [deactAsk, setDeactAsk] = useState(false);
   const [busy, setBusy] = useState(false);
-  const devices = SAMPLE_DEVICES.filter((d) => d.current || !prefs.otherSessionsEndedAt);
-  const big = role === 'farmer';
 
-  const signOutOthers = async () => {
-    setBusy(true);
-    await simulate(600);
-    patchData(mergeUserPrefs(user.id, { otherSessionsEndedAt: isoNow() }));
-    audit({ action: 'Signed out other devices', entityType: 'User settings', entityId: user.id, reason: 'Changed by the account holder', summary: 'All other sessions ended (simulated)' });
-    toast('Other devices were signed out (simulated)');
-    setBusy(false); setSignOutAsk(false);
-  };
   const requestDeactivation = async () => {
     setBusy(true);
     await simulate(600);
@@ -233,18 +208,17 @@ export function SecuritySettings() {
   return (
     <div className="stack-lg">
       <Card pad={false}>
+        <div style={{ padding: 'var(--s-5) var(--s-6)', borderBottom: '1px solid var(--grey-200)' }}>
+          <h2 style={{ margin: 0, fontSize: 18 }}>Security Settings</h2>
+        </div>
         <div className="shr-setrow">
-          <div><div className="strong">Change your password</div><div className="small muted">{big ? 'Choose a password only you know.' : 'Set a unique password for better protection.'}</div></div>
+          <div><div className="strong">Change your password</div><div className="small muted">Set a unique password to help protect your account.</div></div>
           <Button variant="outline" onClick={() => setPw(true)}><KeyRound size={16} />Change Password</Button>
         </div>
         <div className="shr-setrow">
-          <div><div className="strong">Sign out of other devices</div><div className="small muted">End every other session. This device stays signed in.</div></div>
-          <Button variant="outline" onClick={() => setSignOutAsk(true)} disabled={devices.length < 2}><LogOut size={16} />Sign out other devices</Button>
-        </div>
-        <div className="shr-setrow">
           <div>
-            <div className="strong">Deactivate account</div>
-            <div className="small muted">An administrator reviews the request. Financial records, agreements and the audit history are kept as required.</div>
+            <div className="strong">Deactivate Account</div>
+            <div className="small muted">Deactivate your account and stop using CollabFarm.</div>
           </div>
           <Button variant="danger-outline" onClick={() => setDeactAsk(true)} disabled={!!prefs.deactivationRequestedAt}><UserX size={16} />Deactivate Account</Button>
         </div>
@@ -256,17 +230,7 @@ export function SecuritySettings() {
         </Banner>
       )}
 
-      <Card>
-        <CardHeader title="Where you are signed in" subtitle="Sample sessions for this demo." />
-        <ul className="shr-devices">
-          {devices.map((d) => { const Icon = d.icon; return (
-            <li key={d.id}><Icon size={22} /><div><div className="strong small">{d.name}{d.current && <span className="chip" style={{ marginLeft: 8, background: 'var(--primary-50)', color: 'var(--primary-700)' }}>Current</span>}</div><div className="caption muted">{d.place} &middot; {d.when}</div></div></li>
-          ); })}
-        </ul>
-      </Card>
-
       <PasswordModal open={pw} onClose={() => setPw(false)} />
-      <ConfirmDialog open={signOutAsk} onClose={() => setSignOutAsk(false)} onConfirm={signOutOthers} loading={busy} tone="amber" title="Sign out of other devices?" message="Every other session will end. You will need to sign in again on those devices." confirmLabel="Sign out others" />
       <ConfirmDialog open={deactAsk} onClose={() => setDeactAsk(false)} onConfirm={requestDeactivation} loading={busy} tone="danger" title="Request account deactivation?" message="An administrator will review your request. Your sign in is not removed straight away." warning="Records of money, agreements and complaints are never deleted. They stay for audit and legal reasons." summary={[['Account', user.name], ['Role', role], ['Effect', 'Request only. No data is deleted.']]} confirmLabel="Send request" />
     </div>
   );

@@ -23,11 +23,9 @@ export function OverviewTab({ pkg, farms }) {
           <CardHeader title="About this package" subtitle="What it funds and the main terms." />
           <p style={{ marginBottom: 12 }}>{pkg.description || 'No description yet.'}</p>
           <InfoList compact items={[
-            ['Crop or activity', pkg.crop || pkg.category],
-            ['Farming dates', pkg.startDate && pkg.endDate ? `${formatDate(pkg.startDate)} to ${formatDate(pkg.endDate)}` : 'Not set'],
             ['Funding closes', pkg.closingDate ? formatDate(pkg.closingDate) : 'Not set'],
             ['Minimum funding target', pkg.minTarget ? formatNaira(pkg.minTarget) : 'Not set'],
-            ['Investment per investor', `${formatNaira(pkg.minInvestment)} to ${formatNaira(pkg.maxInvestment)}`],
+            ['Maximum funding amount', formatNaira(pkg.maxInvestment)],
             ['Expected return (estimate)', `${range ? `${range}, about ` : ''}${pkg.expectedRoiPct}% (an estimate, not a promise)`],
             ['Cooperative share', `${pkg.coopSharePct}% of profit`],
             ['Expected output', pkg.expectedOutput || 'Not set'],

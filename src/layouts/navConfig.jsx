@@ -17,10 +17,8 @@ export const NAV = {
       { to: '/coop/profile', label: 'Profile', icon: I(UserCircle) },
     ],
     more: [
-      { to: '/coop/farms', label: 'Farms and Plots', icon: I(Sprout) },
       { to: '/coop/contracts', label: 'Contracts', icon: I(FileSignature) },
       { to: '/coop/complaints', label: 'Complaints', icon: I(MessageSquareWarning) },
-      { to: '/coop/audit-log', label: 'Audit History', icon: I(ScrollText) },
     ],
     bottom: [
       { to: '/coop/settings', label: 'Settings', icon: I(Settings) },
