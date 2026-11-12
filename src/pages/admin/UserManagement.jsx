@@ -91,7 +91,7 @@ export default function UserManagement() {
       update(coll, r.id, next === 'Suspended' ? { status: 'Suspended', statusBeforeSuspension: r.rec.status, suspendedReason: reason } : { status: r.rec.statusBeforeSuspension || 'Verified', reactivatedReason: reason }, entry);
     }
     notify(PARTY_ROLE[r.role] || 'admin', next === 'Suspended' ? 'Account suspended' : 'Account reactivated',
-      next === 'Suspended' ? `Account update for ${r.name}: your account is suspended. Reason: ${reason}` : `Account update for ${r.name}: your account is active again.`, r.role === 'admin' ? '/admin/users' : '/onboarding/status', 'verification');
+      next === 'Suspended' ? `Account update for ${r.name}: your account is suspended. Reason: ${reason}` : `Account update for ${r.name}: your account is active again.`, r.role === 'admin' ? '/admin/users' : r.role === 'cooperative' ? '/onboarding/cooperative' : r.role === 'investor' ? '/onboarding/investor' : '/farmer', 'verification');
     toast(`${r.name} ${next === 'Suspended' ? 'suspended' : 'reactivated'}.`);
     setAction(null);
   };

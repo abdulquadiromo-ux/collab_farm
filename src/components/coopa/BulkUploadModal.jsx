@@ -95,7 +95,7 @@ export function BulkUploadModal({ open, onClose, coop, farmers, verified }) {
           <p className="muted small">Add many farmers at once from a CSV file. Each farmer is added as <strong>Pending</strong> until a CollabFarm reviewer checks their identity. The file is read on your device and checked row by row before anything is saved.</p>
           {!verified && (
             <Banner tone="warn" title="Importing is not available yet">
-              Bulk import unlocks after your cooperative is verified. You can still check a file here. Until then, add farmers one at a time. <Link to="/onboarding/status" className="strong">View verification status</Link>
+              Bulk import unlocks after your cooperative is verified. You can still check a file here. Until then, add farmers one at a time. <Link to="/onboarding/cooperative" className="strong">Review cooperative profile</Link>
             </Banner>
           )}
           <div
@@ -134,7 +134,7 @@ export function BulkUploadModal({ open, onClose, coop, farmers, verified }) {
             <div><span className="muted caption">Need fixing</span><strong className={invalid ? 'danger-text' : ''}>{invalid}</strong></div>
           </div>
           {invalid > 0 && <Banner tone="warn">Only the {valid.length} valid {valid.length === 1 ? 'row' : 'rows'} will be imported. Rows with problems are skipped. Fix them in your file and upload it again.</Banner>}
-          {!verified && <Banner tone="warn">Importing is not available until your cooperative is verified. <Link to="/onboarding/status" className="strong">View verification status</Link></Banner>}
+          {!verified && <Banner tone="warn">Importing is not available until your cooperative is verified. <Link to="/onboarding/cooperative" className="strong">Review cooperative profile</Link></Banner>}
           <div className="coopa-bulk-scroll">
             <table className="data-table coopa-bulk-table">
               <thead><tr><th>Row</th><th>Name</th><th>NIN</th><th>Phone</th><th>Crop</th><th>Check</th></tr></thead>

@@ -90,7 +90,7 @@ export default function DisbursementRequest({ onClose, defaultPackageId = '' }) 
   // Checks that block a request. They are shown as soon as the cause is selected, with a plain explanation.
   const issues = [];
   if (coop && coop.status !== 'Verified') {
-    issues.push({ key: 'coop', text: 'Your cooperative is not verified yet, so it cannot request disbursements.', to: '/onboarding/status', linkLabel: 'Check verification status' });
+    issues.push({ key: 'coop', text: 'Your cooperative is not verified yet, so it cannot request disbursements.', to: '/onboarding/cooperative', linkLabel: 'Review profile' });
   }
   if (pkg && !DISBURSE_PACKAGE_OK.includes(pkg.status)) {
     issues.push({ key: 'pkg', text: `${pkg.name} is ${pkg.status}. Disbursements open only while a package is Active.` });

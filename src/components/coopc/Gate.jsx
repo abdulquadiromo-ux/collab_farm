@@ -14,7 +14,7 @@ export function VerifyGate({ what = 'request disbursements or submit records' })
   return (
     <Banner tone="warn" title="Your cooperative is not verified yet">
       Until a CollabFarm reviewer verifies your cooperative, you cannot {what}.{' '}
-      <Link to="/onboarding/status">Check your verification status</Link>.
+      <Link to="/onboarding/cooperative">Review your cooperative profile</Link>.
     </Banner>
   );
 }

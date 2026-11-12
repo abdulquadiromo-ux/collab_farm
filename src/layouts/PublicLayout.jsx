@@ -63,7 +63,7 @@ export default function PublicLayout() {
             <div><h4>Support</h4><Link to="/faq">FAQ</Link><Link to="/contact">Contact and support</Link><Link to="/complaints-information">Complaints and disputes</Link><Link to="/login">Login</Link></div>
             <div><h4>Legal</h4><Link to="/terms">Terms of service</Link><Link to="/privacy">Privacy policy</Link><Link to="/about">About CollabFarm</Link></div>
           </div>
-          <p className="caption muted center" style={{ marginTop: 40 }}>Copyright 2026 CollabFarm Finance. All rights reserved. This site runs on sample data for demonstration.</p>
+          <p className="caption muted center" style={{ marginTop: 40 }}>Copyright 2026 CollabFarm Finance. All rights reserved.</p>
         </div>
       </footer>
       <ChatWidget />

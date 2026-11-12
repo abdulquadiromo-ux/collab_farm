@@ -1,4 +1,4 @@
-import { Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { ToastHost } from './context/AppContext.jsx';
 import PublicLayout from './layouts/PublicLayout.jsx';
 import AuthLayout from './layouts/AuthLayout.jsx';
@@ -37,6 +37,7 @@ export default function App() {
         <Route path="/investor" element={<DashboardLayout role="investor" />}>{build(investorRoutes)}</Route>
         <Route path="/admin" element={<DashboardLayout role="admin" />}>{build(adminRoutes)}</Route>
         <Route path="/farmer" element={<DashboardLayout role="farmer" />}>{build(farmerRoutes)}</Route>
+        <Route path="/onboarding/status" element={<Navigate to="/login" replace />} />
         <Route element={<PublicLayout />}>
           <Route path="*" element={<Element file="shared/NotFound" />} />
         </Route>

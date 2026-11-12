@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "CollabFarm Finance cooperative portal. Frontend only, runs on mock data.",
+  "description": "CollabFarm Finance cooperative portal.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

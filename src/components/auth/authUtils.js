@@ -69,7 +69,7 @@ export function pathBelongsToRole(role, path) {
   const base = ROLE_META[role]?.base;
   if (!base || typeof path !== 'string') return false;
   if (path === base || path.startsWith(`${base}/`)) return true;
-  if (role === 'cooperative' || role === 'investor') return path === '/onboarding/status' || path === `/onboarding/${role}`;
+  if (role === 'cooperative' || role === 'investor') return path === `/onboarding/${role}`;
   return false;
 }
 export function destinationFor(user, from) {

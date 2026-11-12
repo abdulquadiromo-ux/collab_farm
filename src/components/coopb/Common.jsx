@@ -10,7 +10,7 @@ import { trancheAmounts } from './logic.js';
 export function UnverifiedBanner({ what = 'create or submit funding requests' }) {
   return (
     <Banner tone="warn" title="Your cooperative is not verified yet">
-      You cannot {what} until CollabFarm has verified your cooperative. <Link to="/onboarding/status">Check your verification status</Link>.
+      You cannot {what} until CollabFarm has verified your cooperative. <Link to="/onboarding/cooperative">Review your cooperative profile</Link>.
     </Banner>
   );
 }

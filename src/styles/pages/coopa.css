@@ -11,13 +11,6 @@
 .coopa-ok { color: var(--green-600); }
 
 /* ---------- dashboard ---------- */
-.coopa-steps { border-color: var(--primary-100); }
-.coopa-steps__list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-3) var(--s-6); }
-.coopa-step { display: flex; align-items: center; gap: var(--s-3); padding: 12px 14px; border: 1px solid var(--grey-200); border-radius: var(--r-md); background: var(--grey-100); }
-.coopa-step--done { background: var(--primary-50); border-color: var(--primary-100); }
-.coopa-step__num { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; flex: none; font-size: 13px; font-weight: 600; background: var(--white); border: 1px solid var(--grey-400); }
-.coopa-step--done .coopa-step__num { background: var(--green-500); border-color: var(--green-500); color: var(--white); }
-
 .coopa-compact .data-table { min-width: 520px; }
 .coopa-top { align-items: start; }
 
@@ -145,7 +138,7 @@
   .coopa-facts > div:nth-child(odd) { border-left: 0; padding-left: 0; }
 }
 @media (max-width: 720px) {
-  .coopa-steps__list, .coopa-verif { grid-template-columns: 1fr; }
+  .coopa-verif { grid-template-columns: 1fr; }
   .coopa-quick { grid-template-columns: 1fr; }
   .coopa-quick__tile { flex-direction: row; justify-content: flex-start; min-height: 56px; text-align: left; }
   .coopa-head__who { flex-wrap: wrap; }

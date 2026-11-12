@@ -31,7 +31,7 @@ export function UnverifiedBanner({ investor }) {
   return (
     <Banner tone="warn" title="Your investor account is not verified yet">
       Status: {investor.status}. You can browse, but you cannot commit funds until verification is complete.{' '}
-      <Link to="/onboarding/status" className="strong">View verification status</Link>.
+      <Link to="/onboarding/investor" className="strong">Review your profile</Link>.
     </Banner>
   );
 }

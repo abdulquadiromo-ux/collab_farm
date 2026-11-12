@@ -122,10 +122,10 @@ export function useOrgWorkflow() {
     }
     const base = kind === 'cooperative' ? '/coop' : '/investor';
     const copy = {
-      review: ['Review started', `A reviewer started checking ${org.name}. You will be told the result here.`, '/onboarding/status'],
+      review: ['Review started', `A reviewer started checking ${org.name}. You will be told the result here.`, base],
       approve: ['Registration verified', `${org.name} is now verified. You can go to your dashboard. Verification is not a guarantee of funding or returns.`, base],
-      info: ['More information needed', `${org.name}: ${note}`, '/onboarding/status'],
-      reject: ['Registration not approved', `${org.name}: ${note}`, '/onboarding/status'],
+      info: ['More information needed', `${org.name}: ${note}`, kind === 'cooperative' ? '/onboarding/cooperative' : '/onboarding/investor'],
+      reject: ['Registration not approved', `${org.name}: ${note}`, base],
     }[decision];
     notify(kind, copy[0], copy[1], copy[2], 'verification');
     return status;

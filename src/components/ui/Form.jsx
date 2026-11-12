@@ -161,12 +161,12 @@ export function Checkbox({ checked, onChange, children, error }) {
   );
 }
 
-// Local-only upload simulation. Files never leave the browser. onFiles receives [{name,size}]
-export function FileDrop({ label, required, accept = 'JPG, PNG or PDF (Max 5MB)', files = [], onFiles, multiple, error, prompt = 'Click to upload or drag and drop' }) {
+// File selection. Keep the original File available to API-backed forms.
+export function FileDrop({ label, required, accept = 'JPG, PNG or PDF (Max 5MB)', files = [], onFiles, multiple, error, prompt = 'Click to upload or drag and drop', includeFile = false }) {
   const ref = useRef(null);
   const [over, setOver] = useState(false);
   const handle = (list) => {
-    const arr = Array.from(list || []).map((f) => ({ name: f.name, size: f.size }));
+    const arr = Array.from(list || []).map((f) => ({ name: f.name, size: f.size, ...(includeFile ? { file: f } : {}) }));
     if (arr.length) onFiles?.(multiple ? [...files, ...arr] : arr.slice(0, 1));
   };
   return (

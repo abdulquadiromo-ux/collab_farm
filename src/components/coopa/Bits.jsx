@@ -9,7 +9,7 @@ export function UnverifiedBanner({ coop, children }) {
   return (
     <Banner tone="warn" title={`Your cooperative is not verified yet (status: ${coop.status})`}>
       {children || 'You can add farmers and farms, which are saved as Pending. Funding requests, bulk imports and disbursement requests unlock once a CollabFarm reviewer verifies your cooperative.'}
-      {' '}<Link to="/onboarding/status" className="strong">View verification status</Link>
+      {' '}<Link to="/onboarding/cooperative" className="strong">Review cooperative profile</Link>
     </Banner>
   );
 }

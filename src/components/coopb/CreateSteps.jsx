@@ -143,7 +143,7 @@ function CheckRow({ item, onFix }) {
         {!item.ok && item.detail && <div className="caption">{item.detail}</div>}
       </div>
       {!item.ok && item.step != null && <button type="button" className="link-btn small" onClick={() => onFix(item.step)}>Fix this</button>}
-      {!item.ok && item.id === 'verified' && <Link to="/onboarding/status" className="small strong">View status</Link>}
+      {!item.ok && item.id === 'verified' && <Link to="/onboarding/cooperative" className="small strong">Review profile</Link>}
     </li>
   );
 }

@@ -44,7 +44,6 @@ export const authRoutes = [
 export const onboardingRoutes = [
   { path: 'onboarding/cooperative', file: 'auth/OnboardingCooperative' },
   { path: 'onboarding/investor', file: 'auth/OnboardingInvestor' },
-  { path: 'onboarding/status', file: 'auth/OnboardingStatus' },
 ];
 
 export const coopRoutes = [

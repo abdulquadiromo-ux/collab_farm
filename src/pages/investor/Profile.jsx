@@ -133,7 +133,7 @@ export default function Profile() {
       {!verified && (
         <Banner tone="warn" title="Your investor account is not verified yet">
           Status: {investor.status}. You can browse, but you cannot commit funds until verification is complete.{' '}
-          <Link to="/onboarding/status" className="strong">View verification status</Link>.
+          <Link to="/onboarding/investor" className="strong">Review your profile</Link>.
         </Banner>
       )}
 
@@ -165,7 +165,7 @@ export default function Profile() {
               ]} />
               <div className="row" style={{ marginTop: 'var(--s-4)', gap: 'var(--s-3)', flexWrap: 'wrap' }}>
                 <LinkButton to="/investor/risk-disclosures" variant="outline-green" size="sm">{acked ? <ShieldCheck size={16} /> : <ShieldAlert size={16} />}{acked ? 'Review risk disclosure' : 'Acknowledge risks'}</LinkButton>
-                {!verified && <LinkButton to="/onboarding/status" variant="outline" size="sm"><CheckCircle2 size={16} />Verification status</LinkButton>}
+                {!verified && <LinkButton to="/onboarding/investor" variant="outline" size="sm"><CheckCircle2 size={16} />Review profile</LinkButton>}
               </div>
             </Card>
 

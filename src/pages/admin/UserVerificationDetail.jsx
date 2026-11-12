@@ -99,7 +99,8 @@ export default function UserVerificationDetail() {
       reactivate: `Account update for ${name}: your account is active again.`,
     }[action];
     const title = { start: 'Verification under review', approve: 'Verification approved', request: 'More information needed', reject: 'Verification not approved', suspend: 'Account suspended', reactivate: 'Account reactivated' }[action];
-    notify(PARTY_ROLE[role] || 'investor', title, msg, action === 'approve' || action === 'reactivate' ? (ROLE_HOME[role] || '/') : '/onboarding/status', 'verification');
+    const profilePath = role === 'cooperative' ? '/onboarding/cooperative' : role === 'investor' ? '/onboarding/investor' : ROLE_HOME[role] || '/';
+    notify(PARTY_ROLE[role] || 'investor', title, msg, action === 'approve' || action === 'reactivate' ? (ROLE_HOME[role] || '/') : profilePath, 'verification');
     toast(action === 'start' ? 'Review started. You are now the assigned reviewer.' : `${o.action}. ${name} has been notified.`);
     setDialog(null);
   };

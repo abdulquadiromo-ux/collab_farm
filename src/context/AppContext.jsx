@@ -1,21 +1,25 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
-import { createSeed } from '../data/seed.js';
 import { ROLE_META } from '../data/people.js';
 
 /**
  * Client-side application store. FRONTEND ONLY.
  *
- * - All records live in memory and are mirrored to localStorage so a refresh keeps the demo state.
- * - No network calls are made anywhere in this app. "Server" behaviour (approvals, reconciliation,
- *   notifications, audit entries) is simulated here and is clearly labelled as simulated in the UI.
- * - To connect a real backend later, replace the actions below with API calls. Page components only
- *   use the actions and selectors exposed by useApp(), so they would not need to change.
+ * Empty client state while API integrations are being connected.
  */
 
 const AppContext = createContext(null);
-const STORAGE_KEY = 'collabfarm-demo-state-v1';
-const SESSION_KEY = 'collabfarm-demo-session-v1';
+const STORAGE_KEY = 'collabfarm-app-state-v2';
+const SESSION_KEY = 'collabfarm-app-session-v2';
+const TOKEN_KEY = 'collabfarm-access-token';
+
+const emptyData = () => ({
+  users: [], cooperatives: [], investors: [], farmers: [], farms: [], suppliers: [], packages: [],
+  tranches: [], investments: [], transactions: [], wallets: {}, disbursements: [], milestones: [],
+  inputRecords: [], expenses: [], harvests: [], sales: [], distributions: [], obligations: [],
+  contracts: [], complaints: [], notifications: [], audit: [], reconciliation: [], riskCases: [],
+  applications: [], userVerification: [], platformSettings: {}, userSettings: {},
+});
 
 function safeGet(key) {
   try { return JSON.parse(window.localStorage.getItem(key)); } catch { return null; }
@@ -32,17 +36,22 @@ export const newId = (prefix) => `${prefix}-${(counter += 1).toString(36)}${Math
 const NOW = () => new Date().toISOString();
 
 export function AppProvider({ children }) {
+  // Drop the previous prototype's fabricated records and demo session on upgrade.
+  useEffect(() => { safeRemove('collabfarm-demo-state-v1'); safeRemove('collabfarm-demo-session-v1'); }, []);
   const [data, setData] = useState(() => {
     const saved = safeGet(STORAGE_KEY);
-    return saved && saved.packages ? saved : createSeed();
+    return saved && saved.packages ? { ...emptyData(), ...saved } : emptyData();
   });
   const [sessionUserId, setSessionUserId] = useState(() => safeGet(SESSION_KEY));
+  const [accessToken, setAccessToken] = useState(() => { try { return window.localStorage.getItem(TOKEN_KEY); } catch { return null; } });
+  const [pendingRegistration, setPendingRegistration] = useState(null);
   const [toasts, setToasts] = useState([]);
   const dataRef = useRef(data);
   dataRef.current = data;
 
   useEffect(() => { safeSet(STORAGE_KEY, data); }, [data]);
   useEffect(() => { if (sessionUserId) safeSet(SESSION_KEY, sessionUserId); else safeRemove(SESSION_KEY); }, [sessionUserId]);
+  useEffect(() => { try { if (accessToken) window.localStorage.setItem(TOKEN_KEY, accessToken); else window.localStorage.removeItem(TOKEN_KEY); } catch { /* storage unavailable */ } }, [accessToken]);
 
   const user = useMemo(() => data.users.find((u) => u.id === sessionUserId) || null, [data.users, sessionUserId]);
 
@@ -98,13 +107,30 @@ export function AppProvider({ children }) {
     setSessionUserId(userId);
     return true;
   }, [toast]);
-  const signOut = useCallback(() => setSessionUserId(null), []);
-  const resetDemo = useCallback(() => { safeRemove(STORAGE_KEY); setData(createSeed()); }, []);
-
+  const signOut = useCallback(() => { setSessionUserId(null); setAccessToken(null); }, []);
+  const beginRegistration = useCallback((registration) => setPendingRegistration(registration), []);
+  const clearPendingRegistration = useCallback(() => setPendingRegistration(null), []);
+  const authenticate = useCallback((account, token) => {
+    const hasOrg = account.role === 'cooperative' || account.role === 'investor';
+    const collection = account.role === 'cooperative' ? 'cooperatives' : 'investors';
+    const orgId = hasOrg ? (account.orgId || `${account.role === 'cooperative' ? 'coop' : 'inv'}-${account.id}`) : account.orgId;
+    const authenticatedAccount = { ...account, orgId };
+    setData((d) => {
+      const next = { ...d, users: [authenticatedAccount, ...d.users.filter((u) => u.id !== account.id)] };
+      if (!hasOrg || d[collection].some((org) => org.id === orgId)) return next;
+      const org = account.role === 'cooperative'
+        ? { id: orgId, name: '', regNumber: '', yearEstablished: null, email: account.email || '', phone: account.phone || '', address: '', state: '', lga: '', status: 'Draft', documents: [], bank: { name: '', accountName: '', last4: '' }, onboarding: { step: 0 }, statusHistory: [] }
+        : { id: orgId, name: account.name || '', email: account.email || '', phone: account.phone || '', status: 'Draft', onboarding: { step: 0 }, statusHistory: [] };
+      return { ...next, [collection]: [org, ...d[collection]] };
+    });
+    setAccessToken(token);
+    setSessionUserId(account.id);
+  }, []);
   const value = useMemo(() => ({
     data, user, role: user?.role || null, roleMeta: user ? ROLE_META[user.role] : null,
-    toast, toasts, dismissToast, add, update, audit, notify, patchData, signIn, signOut, resetDemo,
-  }), [data, user, toast, toasts, dismissToast, add, update, audit, notify, patchData, signIn, signOut, resetDemo]);
+    accessToken, pendingRegistration, beginRegistration, clearPendingRegistration,
+    toast, toasts, dismissToast, add, update, audit, notify, patchData, signIn, signOut, authenticate,
+  }), [data, user, accessToken, pendingRegistration, beginRegistration, clearPendingRegistration, toast, toasts, dismissToast, add, update, audit, notify, patchData, signIn, signOut, authenticate]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

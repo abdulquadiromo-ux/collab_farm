@@ -1,11 +1,10 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Scale, Landmark, Bell, LockKeyhole, Gavel, RotateCcw, Save, Undo2, Info } from 'lucide-react';
+import { Scale, Landmark, Bell, LockKeyhole, Gavel, Save, Undo2, Info } from 'lucide-react';
 import { useApp, useSimulatedLoad, simulate } from '../../context/AppContext.jsx';
-import { PageHeader, PageSkeleton, Card, CardHeader, SectionHead, Banner, Button, MoneyField, TextField, TextAreaField, SettingRow, StatusPill, Progress } from '../../components/ui/index.js';
+import { PageHeader, PageSkeleton, Card, SectionHead, Banner, Button, MoneyField, TextField, TextAreaField, SettingRow, StatusPill, Progress } from '../../components/ui/index.js';
 import { formatNaira, formatDateTime, percent } from '../../utils/format.js';
 import { nowIso, DECISION_STATUSES, DECISION_OWNERS } from '../../components/adma/helpers.js';
-import { ReasonDialog, TypedConfirmDialog } from '../../components/adma/Dialogs.jsx';
+import { ReasonDialog } from '../../components/adma/Dialogs.jsx';
 import '../../styles/pages/adma.css';
 
 const ARROW = ' → ';
@@ -90,8 +89,7 @@ function SectionCard({ icon, title, intro, last, dirty, onSave, onDiscard, child
 }
 
 export default function SystemSettings() {
-  const { data, user, patchData, audit, toast, resetDemo } = useApp();
-  const navigate = useNavigate();
+  const { data, user, patchData, audit, toast } = useApp();
   const loading = useSimulatedLoad(350);
   const saved = data.platformSettings;
   const tracker = saved.decisionTracker || {};
@@ -102,7 +100,6 @@ export default function SystemSettings() {
   }));
   const [errors, setErrors] = useState({});
   const [confirm, setConfirm] = useState(null); // { section, values, lines }
-  const [resetOpen, setResetOpen] = useState(false);
 
   if (loading) return <PageSkeleton />;
 
@@ -161,14 +158,6 @@ export default function SystemSettings() {
     });
     toast(`${section === 'tracker' ? 'Pending decisions' : SECTIONS[section].title} saved.`);
     setConfirm(null);
-  };
-
-  const doReset = async () => {
-    await simulate(700);
-    resetDemo();
-    toast('Demo data was reset to the original sample records.', 'info');
-    setResetOpen(false);
-    navigate('/admin');
   };
 
   const lim = draft.approvalLimits;
@@ -271,14 +260,6 @@ export default function SystemSettings() {
         </div>
       </Card>
 
-      <Card className="adma-demo">
-        <CardHeader title="Demo tools" subtitle="For this demonstration only. A live platform never offers this." />
-        <Banner tone="danger" title="Demo only: this deletes everything you did in this browser">
-          Resetting puts every record, notification and audit entry back to the original sample data. It cannot be undone. No real data is affected because there is none.
-        </Banner>
-        <div><Button variant="danger-outline" onClick={() => setResetOpen(true)}><RotateCcw size={16} />Reset demo data</Button></div>
-      </Card>
-
       <ReasonDialog
         open={!!confirm}
         onClose={() => setConfirm(null)}
@@ -291,16 +272,6 @@ export default function SystemSettings() {
         placeholder="Why is this changing? For example: approved by the board on 28 October."
         confirmLabel="Save changes"
         warning={confirm && confirm.section === 'approvalLimits' ? 'Changing approval limits affects every payment from now on. Pending payments are checked against the new limits.' : null}
-      />
-      <TypedConfirmDialog
-        open={resetOpen}
-        onClose={() => setResetOpen(false)}
-        onConfirm={doReset}
-        title="Reset all demo data?"
-        message="Every record returns to the original sample data. This is a demo-only tool."
-        warning="Your changes, notifications and audit entries from this session will be lost."
-        phrase="RESET"
-        confirmLabel="Reset demo data"
       />
     </div>
   );

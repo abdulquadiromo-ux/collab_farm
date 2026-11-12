@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useState } from 'react';
 import { NavLink, Outlet, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
-import { Bell, ChevronDown, UserCircle, Menu, LogOut, Repeat, Settings as SettingsIcon, Search } from 'lucide-react';
+import { Bell, ChevronDown, UserCircle, Menu, LogOut, Settings as SettingsIcon, Search } from 'lucide-react';
 import { useApp } from '../context/AppContext.jsx';
 import { NAV } from './navConfig.jsx';
 import { ROLE_META } from '../data/people.js';
@@ -76,7 +76,7 @@ function NotificationBell({ role, base }) {
 }
 
 function AccountMenu({ base }) {
-  const { user, data, signIn, signOut, toast } = useApp();
+  const { user, signOut } = useApp();
   const navigate = useNavigate();
   return (
     <Dropdown
@@ -96,12 +96,6 @@ function AccountMenu({ base }) {
           </div>
           <Link className="dropdown__item" to={`${base}/profile`} onClick={close}><UserCircle size={16} />Profile</Link>
           <Link className="dropdown__item" to={`${base}/settings`} onClick={close}><SettingsIcon size={16} />Settings</Link>
-          <div className="dropdown__label">Switch demo account</div>
-          {data.users.filter((u) => u.id !== user.id && u.status !== 'Suspended').map((u) => (
-            <button key={u.id} className="dropdown__item" onClick={() => { if (!signIn(u.id)) return; close(); toast(`Signed in as ${u.name} (${ROLE_META[u.role].label})`, 'info'); navigate(ROLE_META[u.role].base); }}>
-              <Repeat size={16} /><span>{u.name}<span className="caption muted" style={{ display: 'block' }}>{ROLE_META[u.role].label}</span></span>
-            </button>
-          ))}
           <button className="dropdown__item dropdown__item--danger" onClick={() => { signOut(); close(); navigate('/login'); }}><LogOut size={16} />Sign out</button>
         </>
       )}

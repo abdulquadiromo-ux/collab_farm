@@ -68,7 +68,7 @@ export function investGate(investor, pkg) {
     reasons.push({ id: 'noinv', text: 'No investor profile was found for this account.' });
     return reasons;
   }
-  if (investor.status !== 'Verified') reasons.push({ id: 'unverified', text: `Your investor account is ${investor.status}. Only verified investors can commit funds.`, to: '/onboarding/status', toLabel: 'Check verification status' });
+  if (investor.status !== 'Verified') reasons.push({ id: 'unverified', text: `Your investor account is ${investor.status}. Only verified investors can commit funds.`, to: '/onboarding/investor', toLabel: 'Review profile' });
   if (investor.riskAcknowledged !== true) reasons.push({ id: 'risk', text: 'You have not acknowledged the risk disclosures yet.', to: '/investor/risk-disclosures', toLabel: 'Read and acknowledge risks' });
   if (pkg.status !== 'Open for Funding') {
     const why = pkg.status === 'Funding Target Reached' ? 'This package has reached its funding target and is closed to new commitments.'

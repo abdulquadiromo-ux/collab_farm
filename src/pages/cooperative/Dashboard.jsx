@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Check, ChevronRight, Landmark, PackageCheck, Printer, ShieldCheck, Users, Banknote, Circle,
+  ChevronRight, Landmark, PackageCheck, Printer, ShieldCheck, Users, Banknote, Circle,
 } from 'lucide-react';
 import {
   Avatar, Button, Card, CardHeader, DataTable, EmptyState, KpiCard, LinkButton, PageHeader, PageSkeleton, StatusPill,
@@ -9,14 +9,14 @@ import {
 import { BarChart, DonutChart } from '../../components/charts/Charts.jsx';
 import { useApp, useSimulatedLoad } from '../../context/AppContext.jsx';
 import { ROI_SERIES } from '../../data/governance.js';
-import { formatDate, formatNaira, formatTime, cx } from '../../utils/format.js';
+import { formatDate, formatNaira, formatTime } from '../../utils/format.js';
 import { UnverifiedBanner } from '../../components/coopa/Bits.jsx';
 import { daysAgo, downloadCsv, timeOfDay, toCsv, useCoop } from '../../components/coopa/helpers.js';
 import '../../styles/pages/coopa.css';
 
 export default function Dashboard() {
   const { data, user } = useApp();
-  const { coop, farmers, farms, packages, verified } = useCoop();
+  const { coop, farmers, farms, packages } = useCoop();
   const loading = useSimulatedLoad(350);
   const [range, setRange] = useState('6m');
 
@@ -63,14 +63,6 @@ export default function Dashboard() {
 
   const first = user?.firstName || user?.name?.split(' ')[0] || 'there';
   const activeCount = stats.active.length;
-  const newCoop = farmers.length === 0 && farms.length === 0 && packages.length === 0;
-  const steps = [
-    { done: verified, label: 'Get your cooperative verified', text: 'A reviewer checks your registration documents.', to: '/onboarding/status', cta: 'View status' },
-    { done: farmers.length > 0, label: 'Add your first farmer', text: 'Add farmers one by one or upload a CSV file.', to: '/coop/farmers/new', cta: 'Add Farmer' },
-    { done: farms.length > 0, label: 'Register a farm', text: 'Record where your farmers grow their crops.', to: '/coop/farms', cta: 'Add farm' },
-    { done: packages.length > 0, label: 'Create a funding request', text: 'Available once your cooperative is verified.', to: '/coop/funding/new', cta: 'Start request', locked: !verified },
-  ];
-  const showSteps = steps.some((s) => !s.done);
 
   const exportReport = () => {
     downloadCsv('cooperative-summary.csv', toCsv([
@@ -93,25 +85,6 @@ export default function Dashboard() {
       />
 
       <UnverifiedBanner coop={coop} />
-
-      {showSteps && (
-        <Card className="coopa-steps">
-          <CardHeader title={newCoop ? 'Welcome. Here is how to get started' : 'Finish setting up your cooperative'} subtitle="Complete these steps in any order. Funding steps unlock after verification." />
-          <ol className="coopa-steps__list">
-            {steps.map((s, i) => (
-              <li key={s.label} className={cx('coopa-step', s.done && 'coopa-step--done')}>
-                <span className="coopa-step__num">{s.done ? <Check size={14} strokeWidth={3} /> : i + 1}</span>
-                <div className="grow">
-                  <div className="strong small">{s.label}</div>
-                  <div className="caption muted">{s.text}</div>
-                </div>
-                {!s.done && (s.locked ? <span className="caption muted">Locked until verified</span> : <LinkButton to={s.to} variant="outline-green" size="sm">{s.cta}</LinkButton>)}
-                {s.done && <span className="caption green strong">Done</span>}
-              </li>
-            ))}
-          </ol>
-        </Card>
-      )}
 
       <div className="kpi-grid">
         <KpiCard

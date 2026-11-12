@@ -31,7 +31,7 @@ function InvestorWizard({ org }) {
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
 
-  if (!EDITABLE_STATUSES.includes(org.status)) return <Navigate to="/onboarding/status" replace />;
+  if (!EDITABLE_STATUSES.includes(org.status)) return <Navigate to={roleMeta.base} replace />;
 
   const clear = (...names) => setErrors((e) => {
     if (!names.some((n) => e[n])) return e;
@@ -60,7 +60,7 @@ function InvestorWizard({ org }) {
     submitOrg({ kind: 'investor', org, patch: investorAllPatch(form), lastStep: LAST });
     setBusy(false);
     toast('Submitted for review. We will tell you the result on the status page.', 'success');
-    navigate('/onboarding/status');
+    navigate(roleMeta.base);
   };
   const onBack = () => goTo(step - 1);
   const onSave = () => {

@@ -1,15 +1,14 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, BadgeCheck, Banknote, Building2, Info, MapPin, Sprout, Tractor, Users, UserCheck, Wheat, ClipboardCheck } from 'lucide-react';
+import { ArrowRight, BadgeCheck, MapPin, Sprout, Tractor, Users, Wheat, ClipboardCheck } from 'lucide-react';
 import '../../styles/pages/pub.css';
 import { useApp } from '../../context/AppContext.jsx';
 import { Banner } from '../../components/ui/index.js';
 import { PhotoFill, Photo } from '../../components/common/Photo.jsx';
-import { formatNaira, formatNumber } from '../../utils/format.js';
+import { formatNumber } from '../../utils/format.js';
 import { INVESTOR_VISIBLE, sum } from '../../utils/rules.js';
 import { useDocTitle, useJoinLinks } from '../../components/pub/hooks.js';
 import { CtaBand, PubSection } from '../../components/pub/PubChrome.jsx';
-import { DashboardPreview } from '../../components/pub/DashboardPreview.jsx';
 import { HERO_FEATURES, VERIFY_CARDS, WHY_CARDS } from '../../components/pub/content.jsx';
 
 const NODE_ICONS = [Sprout, Wheat, Tractor, Users];
@@ -19,7 +18,6 @@ export default function Home() {
   const { data } = useApp();
   const { signedIn, dashboardTo } = useJoinLinks();
 
-  // Figma shows template numbers. These are counted from the sample records instead.
   const stats = useMemo(() => {
     const approved = data.packages.filter((p) => INVESTOR_VISIBLE.includes(p.status));
     return {
@@ -29,13 +27,6 @@ export default function Home() {
       value: sum(approved, (p) => p.amount),
     };
   }, [data]);
-
-  const statItems = [
-    { icon: UserCheck, value: formatNumber(stats.farmers), label: 'Verified farmers' },
-    { icon: Building2, value: formatNumber(stats.coops), label: 'Verified cooperatives' },
-    { icon: ClipboardCheck, value: formatNumber(stats.packages), label: 'Approved funding packages' },
-    { icon: Banknote, value: formatNaira(stats.value, { compact: true }), label: 'Value of approved packages', sub: 'Funding targets, not money received' },
-  ];
 
   return (
     <>
@@ -77,26 +68,6 @@ export default function Home() {
       </section>
 
       {/* ---------------- Stats band ---------------- */}
-      <section className="stats-band pub-stats" aria-label="Sample figures from this demo">
-        <div className="container">
-          <div className="stats-band__grid">
-            {statItems.map((s) => {
-              const Icon = s.icon;
-              return (
-                <div className="stat" key={s.label}>
-                  <span className="stat__icon" aria-hidden="true"><Icon size={28} /></span>
-                  <div>
-                    <div className="pub-stat__value">{s.value}</div>
-                    <div className="pub-stat__label">{s.label}</div>
-                    {s.sub && <div className="pub-stat__sub">{s.sub}</div>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <p className="pub-stats__note"><Info size={14} aria-hidden="true" />Sample figures from this demo</p>
-        </div>
-      </section>
 
       {/* ---------------- Explore ---------------- */}
       <PubSection id="explore" title="Explore Our Platform" sub="Navigate through our agricultural finance ecosystem">
@@ -161,11 +132,6 @@ export default function Home() {
         <p className="center small" style={{ marginTop: 20 }}>
           <Link to="/how-it-works?role=cooperative&step=5" className="pub-link">See how evidence is reviewed<ArrowRight size={14} /></Link>
         </p>
-      </PubSection>
-
-      {/* ---------------- Ecosystem ---------------- */}
-      <PubSection id="ecosystem" title="Ecosystem Integration" sub="All stakeholders work together in one platform, with trust, transparency and shared accountability in agricultural finance.">
-        <DashboardPreview />
       </PubSection>
 
       {/* ---------------- Why choose ---------------- */}

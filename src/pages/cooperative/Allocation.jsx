@@ -208,7 +208,7 @@ export default function Allocation() {
         )}
       />
 
-      {!verified && <Banner tone="warn" title="Your cooperative is not verified yet">You cannot change allocations until CollabFarm verifies your cooperative. <Link to="/onboarding/status">Check your status</Link>.</Banner>}
+      {!verified && <Banner tone="warn" title="Your cooperative is not verified yet">You cannot change allocations until CollabFarm verifies your cooperative. <Link to="/onboarding/cooperative">Review your profile</Link>.</Banner>}
       <PlainTerms terms={['allocation', 'agreementC']} />
       <KpiStrip cells={cells} />
 
