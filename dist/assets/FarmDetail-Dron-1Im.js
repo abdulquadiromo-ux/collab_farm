@@ -1,4 +1,8 @@
+<<<<<<<< HEAD:dist/assets/FarmDetail-Dron-1Im.js
 import{c as H,r as c,j as e,g as f,s as E,u as _,a as Y,b as G,P as J,a3 as P,q as U,B as W,C as S,e as $,v as R,U as K,M as Q,L as X,S as C,d as L,I as Z}from"./index-xlQv2wbH.js";import{M as ee,C as se}from"./Modal-pSFdLDex.js";import{D as I}from"./DataTable-BjKd2_mQ.js";import{B as ae,P as te}from"./Nav-oRnJHRMg.js";import{D as ne,a as re}from"./Bits-C2v0z3uH.js";import{b as ie,c as oe}from"./Form-C7V7sHgx.js";import{u as ce,c as de,b as le,f as me,F as ue}from"./coopa-DlNuwnkG.js";import{U as q}from"./upload-B5hIecHp.js";import{P as B}from"./power-Bf1tHp3b.js";import"./search-x-CWf0i_9b.js";import"./circle-x-BmrpAQD0.js";import"./clock-M4sIoiZa.js";import"./eye-K6aKh4FA.js";import"./eye-off-CJ2vbNBu.js";/**
+========
+import{c as H,r as c,j as e,g as f,s as E,u as _,a as Y,b as G,P as J,a3 as P,q as U,B as W,C as S,e as $,v as R,U as K,M as Q,L as X,S as C,d as L,I as Z}from"./index-fuXCOdqP.js";import{M as ee,C as se}from"./Modal-DIk9UuJG.js";import{D as I}from"./DataTable-C0bkK4NG.js";import{B as ae,P as te}from"./Nav-BmhrTge6.js";import{D as ne,a as re}from"./Bits-jvbUzUFB.js";import{b as ie,c as oe}from"./Form-CcK_6nGt.js";import{c as ce,e as de,u as le,f as me,F as ue}from"./coopa-CsiC4yLx.js";import{U as q}from"./upload-CrGGGlgx.js";import{P as B}from"./power-BQCBpeFU.js";import"./search-x-BBXH0TBw.js";import"./circle-x-BpRqO5K5.js";import"./clock-Dmtch0fq.js";import"./eye-BmqWg317.js";import"./eye-off-CqlPGS1B.js";/**
+>>>>>>>> 540dc764fed5c5f45d58c51382d5f0961bd97410:dist/assets/FarmDetail-BwQkixkJ.js
  * @license lucide-react v0.460.0 - ISC
  *
  * This source code is licensed under the ISC license.

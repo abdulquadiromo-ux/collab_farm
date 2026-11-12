@@ -1,4 +1,8 @@
+<<<<<<<< HEAD:dist/assets/DataTable-BjKd2_mQ.js
 import{c as F,r as j,j as t,a6 as A,ah as J,a3 as O}from"./index-xlQv2wbH.js";import{S as R,F as W}from"./Form-C7V7sHgx.js";import{S as Y}from"./search-x-CWf0i_9b.js";import{C as Z}from"./Nav-oRnJHRMg.js";/**
+========
+import{c as F,r as j,j as t,a6 as A,ah as J,a3 as O}from"./index-fuXCOdqP.js";import{S as R,F as W}from"./Form-CcK_6nGt.js";import{S as Y}from"./search-x-BBXH0TBw.js";import{C as Z}from"./Nav-BmhrTge6.js";/**
+>>>>>>>> 540dc764fed5c5f45d58c51382d5f0961bd97410:dist/assets/DataTable-C0bkK4NG.js
  * @license lucide-react v0.460.0 - ISC
  *
  * This source code is licensed under the ISC license.

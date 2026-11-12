@@ -1,4 +1,8 @@
+<<<<<<<< HEAD:dist/assets/RemoveFarmerModal-DMEV4h7m.js
 import{c as F,a as _,l as T,r,j as e,g as i,J as p,f as N,s as S}from"./index-xlQv2wbH.js";import{a as E}from"./Form-C7V7sHgx.js";import{M as f,T as B}from"./Modal-pSFdLDex.js";import{u as M}from"./coopa-DlNuwnkG.js";/**
+========
+import{c as F,a as _,l as T,r,j as e,g as i,J as p,f as N,s as S}from"./index-fuXCOdqP.js";import{a as E}from"./Form-CcK_6nGt.js";import{M as f,T as B}from"./Modal-DIk9UuJG.js";import{c as M}from"./coopa-CsiC4yLx.js";/**
+>>>>>>>> 540dc764fed5c5f45d58c51382d5f0961bd97410:dist/assets/RemoveFarmerModal-DylX00JE.js
  * @license lucide-react v0.460.0 - ISC
  *
  * This source code is licensed under the ISC license.

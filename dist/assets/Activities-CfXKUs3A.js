@@ -1,4 +1,8 @@
+<<<<<<<< HEAD:dist/assets/Activities-CfXKUs3A.js
 import{c as R,a as V,r as l,j as e,C as M,e as O,B as _,g as v,i as J,s as Q,n as X,b as Z,m as ee,a3 as T,q as $,ad as te,W as se,af as D,d as I,h as ae}from"./index-xlQv2wbH.js";import{P as B}from"./Nav-oRnJHRMg.js";import{i as oe,u as ie,f as re,E as ne,I as L,S,d as le}from"./farm-BNmWmGQg.js";import{b as de,a as ce,c as me,T as pe}from"./Form-C7V7sHgx.js";import{M as G}from"./map-pin-tkGjI1pp.js";import{C}from"./camera-dKXS1D1G.js";import"./rules-CjcJ0Kjt.js";import"./user-x-DkaBc35j.js";import"./circle-CcuZKZwe.js";import"./circle-dot-BVE4dyPy.js";import"./clock-M4sIoiZa.js";import"./arrow-right-B_1TPXAi.js";import"./eye-K6aKh4FA.js";import"./eye-off-CJ2vbNBu.js";/**
+========
+import{c as R,a as V,r as l,j as e,C as M,e as O,B as _,g as v,i as J,s as Q,n as X,b as Z,m as ee,a3 as T,q as $,ad as te,W as se,af as D,d as I,h as ae}from"./index-fuXCOdqP.js";import{P as B}from"./Nav-BmhrTge6.js";import{i as oe,u as ie,f as re,E as ne,I as L,S,d as le}from"./farm-BH2JMEla.js";import{b as de,a as ce,c as me,T as pe}from"./Form-CcK_6nGt.js";import{M as G}from"./map-pin-DkqJIdi9.js";import{C}from"./camera-CH8EC7SU.js";import"./rules-CjcJ0Kjt.js";import"./user-x-CjvEkgev.js";import"./circle-BQ2fVoq3.js";import"./circle-dot-B17P9BXt.js";import"./clock-Dmtch0fq.js";import"./arrow-right-BblVL5wg.js";import"./eye-BmqWg317.js";import"./eye-off-CqlPGS1B.js";/**
+>>>>>>>> 540dc764fed5c5f45d58c51382d5f0961bd97410:dist/assets/Activities-CW4Drq3D.js
  * @license lucide-react v0.460.0 - ISC
  *
  * This source code is licensed under the ISC license.

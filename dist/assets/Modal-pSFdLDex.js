@@ -1,4 +1,8 @@
+<<<<<<<< HEAD:dist/assets/Modal-pSFdLDex.js
 import{c as k,r as f,j as e,X as g,a6 as b,J as y,O as _,g as v}from"./index-xlQv2wbH.js";/**
+========
+import{c as k,r as f,j as e,X as g,a6 as b,J as y,O as _,g as v}from"./index-fuXCOdqP.js";/**
+>>>>>>>> 540dc764fed5c5f45d58c51382d5f0961bd97410:dist/assets/Modal-DIk9UuJG.js
  * @license lucide-react v0.460.0 - ISC
  *
  * This source code is licensed under the ISC license.

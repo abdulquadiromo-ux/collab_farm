@@ -1,4 +1,8 @@
+<<<<<<<< HEAD:dist/assets/SettingsPanels-OPpjzmp6.js
 import{c as A,a as x,r as u,j as e,C as q,g as b,B as D,s as N,k as P,X as E}from"./index-xlQv2wbH.js";import{d as w,P as j}from"./Form-C7V7sHgx.js";import{C as T,M as U}from"./Modal-pSFdLDex.js";import{u as R,w as M,m as C,i as O}from"./shrUtils-CUcj1MQK.js";import{K as z}from"./key-round-Bn4cBR8c.js";import{U as B}from"./user-x-DkaBc35j.js";/**
+========
+import{c as A,a as x,r as u,j as e,C as q,g as b,B as D,s as N,k as P,X as E}from"./index-fuXCOdqP.js";import{d as w,P as j}from"./Form-CcK_6nGt.js";import{C as T,M as U}from"./Modal-DIk9UuJG.js";import{u as R,w as M,m as C,i as O}from"./shrUtils-QqJnR9zd.js";import{K as z}from"./key-round-CN9O9FPp.js";import{U as B}from"./user-x-CjvEkgev.js";/**
+>>>>>>>> 540dc764fed5c5f45d58c51382d5f0961bd97410:dist/assets/SettingsPanels-CbGpagdK.js
  * @license lucide-react v0.460.0 - ISC
  *
  * This source code is licensed under the ISC license.

@@ -1,4 +1,8 @@
+<<<<<<<< HEAD:dist/assets/FarmerView-DusruZoM.js
 import{c as p,u,b as f,j as e,P as h,q as n,B as c,K as x,ad as g,C as t,e as i,I as l,S as v}from"./index-xlQv2wbH.js";import{B as j,P as y}from"./Nav-oRnJHRMg.js";import{u as b,M as k}from"./inv-DK9mq9Hq.js";import{i as I,f as P}from"./invData-DnDl1rqZ.js";import{M as w}from"./map-pin-tkGjI1pp.js";import{B}from"./briefcase-BfZdbezQ.js";import{L as z}from"./lock-AO3XfBY-.js";import{E as N}from"./eye-off-CJ2vbNBu.js";import"./rules-CjcJ0Kjt.js";import"./arrow-right-B_1TPXAi.js";import"./arrow-left-CIV-HkzA.js";import"./file-question-CdAh5ERa.js";/**
+========
+import{c as p,u,b as f,j as e,P as h,q as n,B as c,K as x,ad as g,C as t,e as i,I as l,S as v}from"./index-fuXCOdqP.js";import{B as j,P as y}from"./Nav-BmhrTge6.js";import{u as b,M as k}from"./inv-qhmZM4Fk.js";import{i as I,f as P}from"./invData-DnDl1rqZ.js";import{M as w}from"./map-pin-DkqJIdi9.js";import{B}from"./briefcase-BWFnpOLT.js";import{L as z}from"./lock-Cm4O-nhM.js";import{E as N}from"./eye-off-CqlPGS1B.js";import"./rules-CjcJ0Kjt.js";import"./arrow-right-BblVL5wg.js";import"./arrow-left-D230YXaR.js";import"./file-question-Ko7UftFg.js";/**
+>>>>>>>> 540dc764fed5c5f45d58c51382d5f0961bd97410:dist/assets/FarmerView-eAuXXENR.js
  * @license lucide-react v0.460.0 - ISC
  *
  * This source code is licensed under the ISC license.

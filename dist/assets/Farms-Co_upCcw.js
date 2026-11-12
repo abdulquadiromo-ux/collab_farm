@@ -1,4 +1,8 @@
+<<<<<<<< HEAD:dist/assets/Farms-Co_upCcw.js
 import{c as g,b as A,l as k,r as o,j as a,P as w,a3 as d,q as m,g as p,K as N,ad as u,as as S,E as C,C as L,L as M,S as h,v as z}from"./index-xlQv2wbH.js";import{D as P}from"./DataTable-BjKd2_mQ.js";import{P as F}from"./Nav-oRnJHRMg.js";import{A as I}from"./AddFarmModal-DD3_5e5w.js";import{U as T}from"./Bits-C2v0z3uH.js";import{b as V,l as U}from"./coopa-DlNuwnkG.js";import{P as f}from"./plus-CDSZmVe9.js";import"./Form-C7V7sHgx.js";import"./eye-K6aKh4FA.js";import"./eye-off-CJ2vbNBu.js";import"./search-x-CWf0i_9b.js";import"./Modal-pSFdLDex.js";import"./circle-x-BmrpAQD0.js";import"./clock-M4sIoiZa.js";/**
+========
+import{c as b,b as A,l as k,r as o,j as a,P as w,a3 as d,q as m,g as u,K as N,ad as p,at as S,E as C,C as L,L as M,S as h,v as z}from"./index-fuXCOdqP.js";import{D as P}from"./DataTable-C0bkK4NG.js";import{P as F}from"./Nav-BmhrTge6.js";import{A as I}from"./AddFarmModal-Dloe8J-Q.js";import{U as T}from"./Bits-jvbUzUFB.js";import{u as V,o as U}from"./coopa-CsiC4yLx.js";import{P as f}from"./plus-DEO5HflD.js";import"./Form-CcK_6nGt.js";import"./eye-BmqWg317.js";import"./eye-off-CqlPGS1B.js";import"./search-x-BBXH0TBw.js";import"./Modal-DIk9UuJG.js";import"./circle-x-BpRqO5K5.js";import"./clock-Dmtch0fq.js";/**
+>>>>>>>> 540dc764fed5c5f45d58c51382d5f0961bd97410:dist/assets/Farms-7oazZZQD.js
  * @license lucide-react v0.460.0 - ISC
  *
  * This source code is licensed under the ISC license.

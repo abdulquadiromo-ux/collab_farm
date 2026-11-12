@@ -1,0 +1,10 @@
+<<<<<<<< HEAD:dist/assets/search-x-CWf0i_9b.js
+import{c as e}from"./index-xlQv2wbH.js";/**
+========
+import{c as e}from"./index-fuXCOdqP.js";/**
+>>>>>>>> 540dc764fed5c5f45d58c51382d5f0961bd97410:dist/assets/search-x-BBXH0TBw.js
+ * @license lucide-react v0.460.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const a=e("SearchX",[["path",{d:"m13.5 8.5-5 5",key:"1cs55j"}],["path",{d:"m8.5 8.5 5 5",key:"a8mexj"}],["circle",{cx:"11",cy:"11",r:"8",key:"4ej97u"}],["path",{d:"m21 21-4.3-4.3",key:"1qie3q"}]]);export{a as S};
