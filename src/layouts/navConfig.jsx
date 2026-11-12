@@ -63,6 +63,7 @@ export const NAV = {
     more: [],
     bottom: [
       { to: '/admin/users', label: 'User Management', icon: I(Users) },
+      { to: '/admin/help', label: 'Help & Support', icon: I(Headphones) },
     ],
   },
   farmer: {

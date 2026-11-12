@@ -21,7 +21,7 @@ function Sidebar({ role, open, onClose }) {
     <>
       {open && <div className="sidebar-scrim" onClick={onClose} aria-hidden="true" />}
       <aside className={cx('app-sidebar', open && 'app-sidebar--open')} aria-label="Main navigation">
-        <nav className="stack" style={{ gap: 18 }}>
+        <nav className="app-sidebar__nav stack" style={{ gap: 18 }}>
           <div className="nav-group">{nav.main.map(link)}</div>
           {nav.more?.length > 0 && (
             <div className="nav-group">
@@ -30,7 +30,7 @@ function Sidebar({ role, open, onClose }) {
             </div>
           )}
         </nav>
-        <div className="nav-group" style={{ marginTop: 24 }}>{nav.bottom.map(link)}</div>
+        <div className="nav-group nav-group--bottom">{nav.bottom.map(link)}</div>
       </aside>
     </>
   );
