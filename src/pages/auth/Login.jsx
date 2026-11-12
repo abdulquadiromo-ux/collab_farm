@@ -4,10 +4,8 @@ import { useApp } from '../../context/AppContext.jsx';
 import { Banner, Button, PasswordField, TextField } from '../../components/ui/index.js';
 import AuthHeading from '../../components/auth/AuthHeading.jsx';
 import { focusFirstInvalid } from '../../components/auth/authUtils.js';
-import { accountFromAuthResponse } from '../../utils/api.js';
+import { API_BASE_URL, accountFromAuthResponse, apiErrorMessage } from '../../utils/api.js';
 import '../../styles/pages/auth.css';
-
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'https://test-collab-farm.onrender.com').replace(/\/$/, '');
 
 export default function Login() {
   const { data, user, authenticate, toast } = useApp();
@@ -66,16 +64,26 @@ export default function Login() {
       const token = payload?.access_token || payload?.data?.access_token;
       if (!token) { setRequestError('The login response did not include an access token.'); return; }
       const cachedAccount = data.users.find((item) => item.email?.trim().toLowerCase() === form.username.trim().toLowerCase());
-      const account = accountFromAuthResponse(payload, token, form.username.trim(), cachedAccount || {});
+      let account = accountFromAuthResponse(payload, token, form.username.trim(), cachedAccount || {});
       if (!account) {
-        setRequestError('Login succeeded, but the response did not include an account role. Please contact support.');
+        const profileResponse = await fetch(`${API_BASE_URL}/onboard/profile/me`, {
+          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+        });
+        const profilePayload = await profileResponse.json().catch(() => null);
+        if (!profileResponse.ok) {
+          throw new Error(apiErrorMessage(profilePayload, `Login succeeded, but your account profile could not be loaded (${profileResponse.status}).`));
+        }
+        account = accountFromAuthResponse(profilePayload, token, form.username.trim(), cachedAccount || {});
+      }
+      if (!account) {
+        setRequestError('Login succeeded, but your profile did not include an account role. Please contact support.');
         return;
       }
       authenticate(account, token);
       toast(`Signed in as ${account.name}`, 'success');
       navigate(ROLE_DASHBOARD[account.role] || '/', { replace: true });
-    } catch {
-      setRequestError('Could not connect to the login service. Check your connection and try again.');
+    } catch (error) {
+      setRequestError(error.message || 'Could not connect to the login service. Check your connection and try again.');
     } finally {
       setLoading(false);
     }
