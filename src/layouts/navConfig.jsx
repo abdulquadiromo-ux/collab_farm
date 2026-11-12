@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, CircleDollarSign, BarChart3, Banknote, TrendingUp, Landmark, FileBarChart, UserCircle, Settings, Headphones, Wallet, Package, ClipboardList, ShieldCheck, FileCheck2, Scale, Activity, AlertTriangle, ScrollText, UserCog, Building2, Sprout, FileSignature, MessageSquareWarning, Receipt, Wheat, FileText, Bell } from 'lucide-react';
+import { LayoutDashboard, Users, CircleDollarSign, BarChart3, Banknote, TrendingUp, Landmark, FileBarChart, UserCircle, Settings, Headphones, Wallet, Package, ClipboardList, FileCheck2, Scale, Activity, AlertTriangle, ScrollText, UserCog, Building2, Sprout, FileSignature, MessageSquareWarning, Receipt, Wheat, FileText, Bell } from 'lucide-react';
 
 const I = (C) => <C size={22} strokeWidth={1.6} />;
 
@@ -14,14 +14,12 @@ export const NAV = {
       { to: '/coop/farming-progress', label: 'Farming Progress', icon: I(TrendingUp) },
       { to: '/coop/settlements', label: 'Settlements', icon: I(Landmark) },
       { to: '/coop/reports', label: 'Reports', icon: I(FileBarChart) },
-      { to: '/coop/profile', label: 'Profile', icon: I(UserCircle) },
     ],
     more: [
       { to: '/coop/contracts', label: 'Contracts', icon: I(FileSignature) },
       { to: '/coop/complaints', label: 'Complaints', icon: I(MessageSquareWarning) },
     ],
     bottom: [
-      { to: '/coop/settings', label: 'Settings', icon: I(Settings) },
       { to: '/coop/help', label: 'Help & Support', icon: I(Headphones) },
     ],
   },
@@ -32,18 +30,15 @@ export const NAV = {
       { to: '/investor/wallet', label: 'Wallet', icon: I(Wallet) },
       { to: '/investor/packages', label: 'Packages', icon: I(Package) },
       { to: '/investor/investments', label: 'Investments', icon: I(BarChart3) },
-      { to: '/investor/profile', label: 'Profile', icon: I(UserCircle) },
     ],
     more: [
       { to: '/investor/distributions', label: 'Distributions', icon: I(Landmark) },
       { to: '/investor/transactions', label: 'Transactions', icon: I(Receipt) },
       { to: '/investor/contracts', label: 'Agreements', icon: I(FileSignature) },
-      { to: '/investor/risk-disclosures', label: 'Risk Disclosures', icon: I(ShieldCheck) },
       { to: '/investor/reports', label: 'Reports', icon: I(FileBarChart) },
       { to: '/investor/complaints', label: 'Complaints', icon: I(MessageSquareWarning) },
     ],
     bottom: [
-      { to: '/investor/settings', label: 'Settings', icon: I(Settings) },
       { to: '/investor/help', label: 'Help & Support', icon: I(Headphones) },
     ],
   },
@@ -68,7 +63,6 @@ export const NAV = {
     more: [],
     bottom: [
       { to: '/admin/users', label: 'User Management', icon: I(Users) },
-      { to: '/admin/settings', label: 'System Settings', icon: I(Settings) },
     ],
   },
   farmer: {

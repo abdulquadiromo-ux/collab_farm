@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { AlertOctagon, CheckCircle2, CloudRain, Clock, Download, FileText, Landmark, LineChart, Lock, ShieldAlert, ShieldOff, TrendingDown } from 'lucide-react';
-import { Banner, Button, Card, CardHeader, Checkbox, InfoList, Modal, PageHeader, PageSkeleton, StatusPill } from '../../components/ui/index.js';
-import { LinkButton } from '../../components/ui/Button.jsx';
+import { Navigate } from 'react-router-dom';
+import { AlertOctagon, CheckCircle2, CloudRain, Clock, Download, Landmark, LineChart, Lock, ShieldAlert, ShieldOff, TrendingDown } from 'lucide-react';
+import { Banner, Button, Card, CardHeader, Checkbox, InfoList, Modal, PageSkeleton, StatusPill } from '../../components/ui/index.js';
 import { simulate, useSimulatedLoad } from '../../context/AppContext.jsx';
 import { formatDate } from '../../utils/format.js';
 import { useInvestor } from '../../components/inv/useInvestor.js';
@@ -57,6 +56,10 @@ function AckForm({ first, onClose }) {
 }
 
 export default function RiskDisclosures() {
+  return <Navigate to="/investor/contracts?section=risks" replace />;
+}
+
+export function RiskDisclosuresPanel() {
   const loading = useSimulatedLoad(350);
   const { data, investor } = useInvestor();
   const [open, setOpen] = useState(false);
@@ -77,13 +80,10 @@ export default function RiskDisclosures() {
   ].join('\n'));
 
   return (
-    <div className="page">
-      <PageHeader
-        title="Risk Disclosures"
-        subtitle="Plain language. Please read this before you commit money."
-        actions={<Button variant="outline-green" onClick={download}><Download size={16} />Download as text</Button>}
-      />
-
+    <div className="stack-lg">
+      <div className="row" style={{ justifyContent: 'flex-end' }}>
+        <Button variant="outline-green" onClick={download}><Download size={16} />Download as text</Button>
+      </div>
       <Banner tone="warn" title="Investing in farming can lose you money">
         You can lose some or all of the money you put in. Expected returns are estimates and are not guaranteed. A package being approved does not mean it will succeed.
       </Banner>
@@ -139,14 +139,6 @@ export default function RiskDisclosures() {
             )}
           </Card>
 
-          <Card>
-            <CardHeader title="Related" />
-            <div className="stack-sm">
-              <LinkButton to="/investor/contracts" variant="outline" block><FileText size={16} />My agreements</LinkButton>
-              <LinkButton to="/investor/complaints/new" variant="outline" block>Raise a concern</LinkButton>
-              <Link to="/investor/help" className="small">Help and support</Link>
-            </div>
-          </Card>
         </div>
       </div>
 
