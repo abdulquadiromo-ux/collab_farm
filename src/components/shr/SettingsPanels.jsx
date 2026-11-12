@@ -6,6 +6,7 @@ import { Avatar, Banner, Button, Card, CardHeader, ConfirmDialog, InfoList, Moda
 import { RolePill } from './ShrBits.jsx';
 import { baseFor, byId, canSeeComplaint, contractsForUser, downloadFile, isoNow, mergeUserPrefs, userPrefs, whenLabel } from './shrUtils.js';
 import { NAIRA, formatDate, formatDateShort, formatNaira } from '../../utils/format.js';
+import { API_BASE_URL, apiErrorMessage } from '../../utils/api.js';
 
 // ---------- shared pieces ----------
 function useSave() {
@@ -131,47 +132,55 @@ export function NotificationSettings() {
 // ============ Security ============
 const RULES = [
   { id: 'len', label: 'At least 8 characters', test: (v) => v.length >= 8 },
-  { id: 'upper', label: 'An uppercase letter', test: (v) => /[A-Z]/.test(v) },
-  { id: 'num', label: 'A number', test: (v) => /[0-9]/.test(v) },
-  { id: 'sym', label: 'A symbol', test: (v) => /[^A-Za-z0-9]/.test(v) },
 ];
 
 export function PasswordModal({ open, onClose }) {
-  const { user, audit, toast } = useApp();
+  const { user, audit, toast, accessToken } = useApp();
   const [f, setF] = useState({ old: '', next: '', confirm: '' });
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
+  const [requestError, setRequestError] = useState('');
   const set = (k) => (e) => { setF((x) => ({ ...x, [k]: e.target.value })); setErrors((x) => ({ ...x, [k]: undefined })); };
-  const close = () => { setF({ old: '', next: '', confirm: '' }); setErrors({}); onClose(); };
+  const close = () => { setF({ old: '', next: '', confirm: '' }); setErrors({}); setRequestError(''); onClose(); };
   const submit = async () => {
     const e = {};
     if (!f.old) e.old = 'Enter your current password.';
-    if (!RULES.every((r) => r.test(f.next))) e.next = 'The new password does not meet all the rules below.';
+    if (!RULES.every((r) => r.test(f.next))) e.next = 'Your new password must contain at least 8 characters.';
     else if (f.next === f.old) e.next = 'Choose a password different from the current one.';
     if (f.confirm !== f.next) e.confirm = 'The two new passwords do not match.';
     setErrors(e);
     if (Object.keys(e).length) return;
     setBusy(true);
-    await simulate(700);
-    audit({ action: 'Changed password', entityType: 'User settings', entityId: user.id, reason: 'Changed by the account holder', summary: 'Password changed. No password value is stored or logged.' });
-    toast('Your password was changed (simulated). Other devices stay signed in until you sign them out.');
-    setBusy(false);
-    close();
+    setRequestError('');
+    try {
+      if (!accessToken) throw new Error('Your session has expired. Sign in again to change your password.');
+      const response = await fetch(`${API_BASE_URL}/onboard/profile/change-password`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ current_password: f.old, new_password: f.next, confirm_password: f.confirm }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(apiErrorMessage(payload, `Could not change password (${response.status}).`));
+      audit({ action: 'Changed password', entityType: 'User settings', entityId: user.id, reason: 'Changed by the account holder', summary: 'Password changed. No password value is stored or logged.' });
+      toast('Your password was changed successfully.');
+      close();
+    } catch (error) { setRequestError(error.message || 'Could not change password.'); }
+    finally { setBusy(false); }
   };
   return (
     <Modal open={open} onClose={close} title="Change Password" white>
       <div className="stack">
+        {requestError && <Banner tone="warn" title="Password not changed">{requestError}</Banner>}
         <PasswordField label="Current password" value={f.old} onChange={set('old')} error={errors.old} autoComplete="off" placeholder="Type here" />
         <PasswordField label="New password" value={f.next} onChange={set('next')} error={errors.next} autoComplete="off" placeholder="Type here" />
         <div className="shr-pwhint" aria-live="polite">
-          <strong>Use at least 8 characters, including an uppercase letter, a number and a symbol.</strong>
+          <strong>Use at least 8 characters.</strong>
           <ul>
             {RULES.map((r) => { const ok = r.test(f.next); return <li key={r.id} className={ok ? 'ok' : ''}>{ok ? <Check size={14} /> : <X size={14} />}{r.label}</li>; })}
           </ul>
         </div>
         <PasswordField label="Confirm new password" value={f.confirm} onChange={set('confirm')} error={errors.confirm} autoComplete="off" placeholder="Type here" />
         <Button block onClick={submit} loading={busy}>Change Password</Button>
-        <p className="caption muted">Demo only. The password is not stored or sent anywhere, and any current password is accepted.</p>
       </div>
     </Modal>
   );

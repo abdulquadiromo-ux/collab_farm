@@ -1,19 +1,21 @@
 import { useEffect, useState } from 'react';
 import { Button, Modal, TextField } from '../ui/index.js';
-import { useApp, simulate } from '../../context/AppContext.jsx';
-import { nextFarmId, useStableCallback } from './helpers.js';
+import { useApp } from '../../context/AppContext.jsx';
+import { useStableCallback } from './helpers.js';
+import { API_BASE_URL, apiErrorMessage } from '../../utils/api.js';
 
 const BLANK = { name: '', location: '', areaHa: '' };
 
 // Add farm dialog (Figma 7350:16180, with the land access and season fields the PRD requires).
-export function AddFarmModal({ open, onClose, coop, farms, onAdded }) {
-  const { data, add, toast } = useApp();
+export function AddFarmModal({ open, onClose, farmerId, farms = [], onAdded }) {
+  const { toast, accessToken } = useApp();
   const [v, setV] = useState(BLANK);
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
+  const [requestError, setRequestError] = useState('');
   const close = useStableCallback(() => { if (!busy) onClose?.(); });
 
-  useEffect(() => { if (open) { setV(BLANK); setErrors({}); setBusy(false); } }, [open]);
+  useEffect(() => { if (open) { setV(BLANK); setErrors({}); setBusy(false); setRequestError(''); } }, [open]);
 
   const set = (k) => (e) => {
     setV((s) => ({ ...s, [k]: e.target.value }));
@@ -36,15 +38,21 @@ export function AddFarmModal({ open, onClose, coop, farms, onAdded }) {
   const submit = async () => {
     if (!validate()) return;
     setBusy(true);
-    await simulate(600);
-    const record = add('farms', {
-      id: nextFarmId(data.farms), coopId: coop.id, name: v.name.trim(), location: v.location.trim(), areaHa: Number(v.areaHa),
-      landAccess: 'Pending', landAccessType: '', crop: '', season: '', status: 'Active', lastInspection: null, documents: [], documentRecords: [],
-    }, { action: 'Farm added', entityType: 'Farm', summary: `${v.name.trim()}, ${v.areaHa} ha, ${v.location.trim()}`, reason: 'Added by cooperative. Land-access evidence not yet uploaded.' });
-    toast(`${record.name} was added. Upload land-access evidence so it can be verified.`, 'success');
-    setBusy(false);
-    onClose?.();
-    onAdded?.(record);
+    setRequestError('');
+    try {
+      if (!accessToken) throw new Error('Your session has expired. Sign in again before adding a farm.');
+      if (!farmerId) throw new Error('A farmer must be selected before adding a farm.');
+      const response = await fetch(`${API_BASE_URL}/farmers/${encodeURIComponent(farmerId)}/farms`, {
+        method: 'POST', headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: v.name.trim(), location: v.location.trim(), size_in_hectares: Number(v.areaHa), status: 'ACTIVE' }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(apiErrorMessage(payload, `Could not add farm (${response.status}).`));
+      const record = { ...payload, areaHa: payload?.size_in_hectares ?? Number(v.areaHa), status: payload?.status === 'INACTIVE' ? 'Inactive' : 'Active' };
+      toast(`${record.name || v.name} was added.`, 'success');
+      onClose?.(); onAdded?.(record);
+    } catch (error) { setRequestError(error.message || 'Could not add farm.'); }
+    finally { setBusy(false); }
   };
 
   return (
@@ -66,6 +74,7 @@ export function AddFarmModal({ open, onClose, coop, farms, onAdded }) {
         <TextField label="Location" required placeholder="Village or town, LGA" value={v.location} onChange={set('location')} error={errors.location} />
         <TextField label="Size (hectares)" required inputMode="decimal" placeholder="For example, 12.5" value={v.areaHa} onChange={set('areaHa')} error={errors.areaHa} />
       </div>
+      {requestError && <p className="field-error" role="alert">{requestError}</p>}
     </Modal>
   );
 }

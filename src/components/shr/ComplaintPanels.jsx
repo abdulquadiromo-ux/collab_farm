@@ -44,7 +44,7 @@ export function ActionsThread({ actions }) {
   return <Timeline items={items} />;
 }
 
-// Comment or "add more information". `allowFiles` lets the submitter attach more evidence names.
+// Comment or "add more information". `allowFiles` lets the submitter attach evidence.
 export function CommentBox({ onSubmit, label = 'Add a comment', placeholder = 'Write your message', allowFiles = true }) {
   const [text, setText] = useState('');
   const [files, setFiles] = useState([]);
@@ -54,14 +54,18 @@ export function CommentBox({ onSubmit, label = 'Add a comment', placeholder = 'W
     e.preventDefault();
     if (text.trim().length < 3) { setError('Write a short message first.'); return; }
     setBusy(true);
-    await onSubmit({ text: text.trim(), files });
-    setBusy(false);
-    setText(''); setFiles([]); setError('');
+    try {
+      const submitted = await onSubmit({ text: text.trim(), files });
+      if (submitted === false) { setError('Your message could not be sent. Please try again.'); return; }
+      setText(''); setFiles([]); setError('');
+    } catch (submitError) {
+      setError(submitError?.message || 'Your message could not be sent. Please try again.');
+    } finally { setBusy(false); }
   };
   return (
     <form onSubmit={send} className="stack" noValidate>
       <TextAreaField label={label} value={text} onChange={(e) => { setText(e.target.value); setError(''); }} error={error} placeholder={placeholder} rows={4} />
-      {allowFiles && <FileDrop multiple files={files} onFiles={setFiles} accept="Optional evidence. Files stay on your device in this demo." prompt="Attach evidence" />}
+      {allowFiles && <FileDrop multiple includeFile files={files} onFiles={setFiles} accept="Optional photo, receipt or document attachments." prompt="Attach evidence" />}
       <div><Button type="submit" loading={busy}><Paperclip size={16} />Post to this complaint</Button></div>
     </form>
   );

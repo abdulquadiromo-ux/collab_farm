@@ -10,7 +10,7 @@ export const todayIso = () => new Date().toISOString().slice(0, 10);
 export const newBudgetItem = (patch = {}) => ({ id: newId('b'), category: '', description: '', amount: '', responsible: '', files: [], ...patch });
 
 export const emptyForm = () => ({
-  name: '', category: '', tier: 'Custom', description: '', crop: '', farmIds: [], season: '',
+  name: '', category: '', tier: 'Starter', description: '', crop: '', farmIds: [], season: '',
   startDate: '', endDate: '', closingDate: '', tenureMonths: '',
   minInvestment: '', maxInvestment: '', minTarget: '', expectedOutput: '',
   returnLow: '', returnHigh: '',
@@ -38,26 +38,11 @@ export function templateFor(category, tier) {
 }
 
 // Pre-filled form from a package template. Amounts are placeholders the cooperative must replace with quotation figures.
+// Starts a category-specific package without seeding example amounts or budget rows.
 export function templateForm(category, tier) {
-  const tpl = templateFor(category, tier);
   const form = emptyForm();
   form.category = TEMPLATE_CATEGORIES.includes(category) ? category : '';
-  form.tier = TIERS.includes(tier) ? tier : 'Custom';
-  if (!tpl) return form;
-  form.name = `${category} ${tier} Package`;
-  form.description = `${tpl.tagline}. This package covers: ${tpl.inclusions.join(', ').toLowerCase()}.`;
-  form.amount = tpl.amount;
-  form.minTarget = Math.round((tpl.amount * 0.6) / 1000) * 1000;
-  form.minInvestment = 50000;
-  form.maxInvestment = Math.round((tpl.amount * 0.5) / 10000) * 10000;
-  const n = tpl.inclusions.length;
-  const each = Math.floor(tpl.amount / n / 1000) * 1000;
-  form.budget = tpl.inclusions.map((label, i) => newBudgetItem({
-    category: guessBudgetCategory(label),
-    description: label,
-    amount: i === 0 ? tpl.amount - each * (n - 1) : each,
-    responsible: 'Cooperative procurement lead',
-  }));
+  form.tier = TIERS.includes(tier) ? tier : 'Starter';
   return form;
 }
 
@@ -68,7 +53,7 @@ export function packageToForm(pkg) {
   }));
   const roi = pkg.expectedRoiPct;
   return {
-    name: pkg.name || '', category: pkg.category || '', tier: pkg.tier || 'Custom', description: pkg.description || '', crop: pkg.crop || '',
+    name: pkg.name || '', category: pkg.category || '', tier: pkg.tier || 'Starter', description: pkg.description || '', crop: pkg.crop || '',
     farmIds: pkg.farmIds || [], season: pkg.season || '', startDate: pkg.startDate || '', endDate: pkg.endDate || '', closingDate: pkg.closingDate || '',
     tenureMonths: pkg.tenureMonths ?? '', minInvestment: pkg.minInvestment ?? '', maxInvestment: pkg.maxInvestment ?? '',
     minTarget: pkg.minTarget ?? '', expectedOutput: pkg.expectedOutput || '',
@@ -76,6 +61,49 @@ export function packageToForm(pkg) {
     amount: pkg.amount ?? '', expectedRoiPct: roi ?? '', coopSharePct: pkg.coopSharePct ?? 10,
     risks: (pkg.risks || []).join('\n'), budget: budget.length ? budget : [newBudgetItem()],
     farmers: (pkg.farmers || []).map((f) => ({ farmerId: f.farmerId || f.farmer_id || f.id, allocatedAmount: f.allocatedAmount ?? f.allocated_amount ?? '' })),
+  };
+}
+
+export function apiPackageToModel(pkg) {
+  const categoryLabels = { CROP_FARMING: 'Crop Farming', FISHERY: 'Fishery', MIXED_FARMING: 'Mixed Farming', LIVESTOCK: 'Livestock', POULTRY: 'Poultry', CUSTOM: 'Custom' };
+  const tierLabels = { STARTER: 'Starter', GROWTH: 'Growth', COMMERCIAL: 'Commercial', CUSTOM: 'Custom' };
+  const statusLabels = { DRAFT: 'Draft', PENDING: 'Submitted', PENDING_ADMIN: 'Under Review', SUBMITTED: 'Submitted', UNDER_REVIEW: 'Under Review', CHANGES_REQUESTED: 'Changes Requested', APPROVED: 'Approved', OPEN_FOR_FUNDING: 'Open for Funding', FUNDING_TARGET_REACHED: 'Funding Target Reached', READY_FOR_DISBURSEMENT: 'Ready for Disbursement', ACTIVE: 'Active', PAUSED: 'Paused', COMPLETED: 'Completed', FAILED: 'Failed or Terminated' };
+  const inclusions = Array.isArray(pkg?.whats_included) ? pkg.whats_included : [];
+  const farmers = Array.isArray(pkg?.farmers) ? pkg.farmers : Array.isArray(pkg?.assigned_farmers) ? pkg.assigned_farmers : [];
+  const budget = inclusions.map((item, index) => ({ id: item.id || `api-budget-${index}`, category: item.category || 'Other', description: item.item || item.description || String(item), amount: Number(item.amount) || 0, responsible: item.responsible || '', docs: '', approval: 'Pending' }));
+  const rawStatus = String(pkg?.current_status || pkg?.status || pkg?.review_status || 'PENDING').toUpperCase();
+  const rawCategory = String(pkg?.category || 'CUSTOM').toUpperCase();
+  const rawTier = String(pkg?.package_type || 'STARTER').toUpperCase();
+  return {
+    ...pkg,
+    id: pkg?.id,
+    coopId: pkg?.cooperative_id || pkg?.coopId,
+    name: pkg?.title || pkg?.name || 'Untitled package',
+    category: categoryLabels[rawCategory] || rawCategory,
+    tier: tierLabels[rawTier] || rawTier,
+    description: pkg?.short_description || pkg?.description || '',
+    amount: Number(pkg?.fund_amount ?? pkg?.amount) || 0,
+    minTarget: Number(pkg?.minimum_funding_target ?? pkg?.minTarget) || 0,
+    minInvestment: Number(pkg?.minimum_investment ?? pkg?.minInvestment) || 0,
+    maxInvestment: Number(pkg?.maximum_investment ?? pkg?.maxInvestment) || 0,
+    startDate: pkg?.start_date || pkg?.startDate || '',
+    endDate: pkg?.end_date || pkg?.endDate || '',
+    closingDate: pkg?.funding_closes_on || pkg?.closingDate || '',
+    season: pkg?.farming_cycle || pkg?.season || '',
+    tenureMonths: Number(pkg?.tenure_months ?? pkg?.tenureMonths) || 0,
+    expectedOutput: pkg?.expected_output || pkg?.expectedOutput || '',
+    returnLow: Number(pkg?.expected_return_min ?? pkg?.returnLow) || 0,
+    returnHigh: Number(pkg?.expected_return_max ?? pkg?.returnHigh) || 0,
+    expectedRoiPct: Number(pkg?.expected_roi ?? pkg?.expectedRoiPct) || 0,
+    coopSharePct: Number(pkg?.cooperative_share ?? pkg?.coopSharePct) || 0,
+    farmersCount: Number(pkg?.farmers_count ?? farmers.length) || 0,
+    investorsCount: Number(pkg?.investors_count) || 0,
+    createdAt: pkg?.created_at || pkg?.createdAt || '',
+    status: statusLabels[rawStatus] || rawStatus.replaceAll('_', ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()),
+    inclusions: inclusions.map((item) => ({ ...item, item: item.item || item.description || String(item) })),
+    budget,
+    farmers: farmers.map((farmer) => ({ ...farmer, farmerId: farmer.farmer_id || farmer.farmerId || farmer.id, allocatedAmount: farmer.allocated_amount ?? farmer.allocatedAmount ?? '' })),
+    apiPayload: pkg,
   };
 }
 
@@ -93,7 +121,7 @@ export function formToPackage(form, { coopId, existing, farms, status }) {
   const amount = Number(form.amount) || 0;
   const apiPayload = {
     title: form.name.trim(),
-    package_type: ({ Starter: 'STARTER', Growth: 'GROWTH', Commercial: 'COMMERCIAL', Custom: 'CUSTOM' })[form.tier] || String(form.tier || 'CUSTOM').toUpperCase(),
+    package_type: ({ Starter: 'STARTER', Growth: 'GROWTH', Commercial: 'COMMERCIAL', Custom: 'STARTER' })[form.tier] || 'STARTER',
     category: ({ 'Crop Farming': 'CROP_FARMING', Fishery: 'FISHERY', 'Mixed Farming': 'MIXED_FARMING', Livestock: 'LIVESTOCK', Poultry: 'POULTRY', Custom: 'CUSTOM' })[form.category] || String(form.category || 'CUSTOM').toUpperCase().replace(/\s+/g, '_'),
     fund_amount: amount,
     start_date: form.startDate,
@@ -217,34 +245,48 @@ export function validateDetails(form) {
   const e = {};
   const amount = Number(form.amount);
   const allocations = (form.farmers || []).filter((f) => f.farmerId);
+  if (!allocations.length) e.farmers = 'Select at least one farmer for this package.';
   allocations.forEach((f) => {
     if (!isNum(f.allocatedAmount) || Number(f.allocatedAmount) <= 0) e[`farmer:${f.farmerId}:amount`] = 'Enter an investment amount above zero.';
   });
-  const totalAllocated = allocations.reduce((sum, f) => sum + (Number(f.allocatedAmount) || 0), 0);
   if (!isNum(form.amount) || amount <= 0) e.amount = 'Enter the total package amount.';
   else {
     if (isNum(form.minTarget) && Number(form.minTarget) > amount) e.amount = 'The package amount cannot be lower than the minimum funding target.';
     else if (isNum(form.maxInvestment) && Number(form.maxInvestment) > amount) e.amount = 'The package amount cannot be lower than the maximum investment per investor.';
-    else if (totalAllocated > amount) e.amount = 'Farmer investment amounts cannot exceed the total package amount.';
   }
   if (!isNum(form.expectedRoiPct) || Number(form.expectedRoiPct) < 0 || Number(form.expectedRoiPct) > 100) e.expectedRoiPct = 'Enter an estimate from 0 to 100 percent.';
   else if (isNum(form.returnLow) && isNum(form.returnHigh) && (Number(form.expectedRoiPct) < Number(form.returnLow) || Number(form.expectedRoiPct) > Number(form.returnHigh))) {
     e.expectedRoiPct = `Keep the estimate inside the range you gave in Package Basics (${form.returnLow}% to ${form.returnHigh}%).`;
   }
-  if (!isNum(form.coopSharePct) || Number(form.coopSharePct) < 0 || Number(form.coopSharePct) > 50) e.coopSharePct = 'Enter the cooperative share, from 0 to 50 percent.';
+  if (!isNum(form.coopSharePct) || Number(form.coopSharePct) < 0 || Number(form.coopSharePct) > 100) e.coopSharePct = 'Enter the cooperative share, from 0 to 100 percent.';
   return { ...e, ...validateBudgetItems(form.budget) };
+}
+
+export function farmerAllocationCheck(form) {
+  const allocations = (form.farmers || []).filter((farmer) => farmer.farmerId);
+  if (!allocations.length) return { ok: false, step: 0, detail: 'Select at least one farmer and allocate the package amount.' };
+  const amount = Number(form.amount) || 0;
+  if (amount <= 0) return { ok: false, step: 1, detail: 'Enter the total package amount before allocating it to farmers.' };
+  const allocated = allocations.reduce((total, farmer) => total + (Number(farmer.allocatedAmount) || 0), 0);
+  const difference = Math.round((amount - allocated) * 100) / 100;
+  if (Math.abs(difference) <= 0.01) return { ok: true, step: 0, detail: '' };
+  return difference > 0
+    ? { ok: false, step: 0, detail: `Farmer allocations must add up to ${formatNaira(amount)}. Allocate the remaining ${formatNaira(difference)}.` }
+    : { ok: false, step: 0, detail: `Farmer allocations must add up to ${formatNaira(amount)}. Reduce allocations by ${formatNaira(Math.abs(difference))}.` };
 }
 
 // What is still missing before a package may be submitted. `ok:false` rows block submission.
 export function submissionChecklist(form, { verified = true, platformMin } = {}) {
   const basics = validateBasics(form, { platformMin });
   const details = validateDetails(form);
+  const allocations = farmerAllocationCheck(form);
   const budgetCheck = budgetReconciles({ budget: form.budget, amount: Number(form.amount) || 0 });
   const reconciles = budgetCheck.ok && budgetCheck.target > 0;
   return [
     { id: 'verified', label: 'Your cooperative is verified', ok: verified, detail: verified ? '' : 'Only verified cooperatives can submit funding requests.', step: null },
     { id: 'basics', label: 'Package basics are complete', ok: !Object.keys(basics).length, detail: Object.keys(basics).length ? `${Object.keys(basics).length} field(s) need attention.` : '', step: 0 },
     { id: 'details', label: 'Funding details are complete', ok: !Object.keys(details).length, detail: Object.keys(details).length ? `${Object.keys(details).length} field(s) need attention.` : '', step: 1 },
+    { id: 'farmerAllocations', label: 'Farmer allocations add up to the package amount', ok: allocations.ok, detail: allocations.detail, step: allocations.step },
     { id: 'reconcile', label: 'Budget reconciles with the package amount', ok: reconciles, detail: reconciles ? '' : budgetCheck.difference > 0 ? `${formatNaira(budgetCheck.difference)} of the package amount is not yet planned.` : `The budget is ${formatNaira(Math.abs(budgetCheck.difference))} over the package amount.`, step: 1 },
   ];
 }

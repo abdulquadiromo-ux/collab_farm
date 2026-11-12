@@ -9,6 +9,7 @@ import { ChatWidget } from '../components/common/ChatWidget.jsx';
 import { Dropdown } from '../components/ui/Dropdown.jsx';
 import { PageSkeleton } from '../components/ui/Card.jsx';
 import { relativeTime, cx } from '../utils/format.js';
+import { API_BASE_URL, apiErrorMessage } from '../utils/api.js';
 
 function Sidebar({ role, open, onClose }) {
   const nav = NAV[role];
@@ -37,11 +38,45 @@ function Sidebar({ role, open, onClose }) {
 }
 
 function NotificationBell({ role, base }) {
-  const { data } = useApp();
-  const items = data.notifications.filter((n) => n.role === role);
-  const unread = items.filter((n) => !n.read).length;
-  const { update } = useApp();
+  const { accessToken } = useApp();
+  const location = useLocation();
   const navigate = useNavigate();
+  const [items, setItems] = useState([]);
+  const [unread, setUnread] = useState(0);
+  useEffect(() => {
+    if (!accessToken) { setItems([]); setUnread(0); return undefined; }
+    const controller = new AbortController();
+    const load = async () => {
+      const headers = { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' };
+      try {
+        const [listResponse, countResponse] = await Promise.all([
+          fetch(`${API_BASE_URL}/notifications?page=1&page_size=5`, { headers, signal: controller.signal }),
+          fetch(`${API_BASE_URL}/notifications/unread-count`, { headers, signal: controller.signal }),
+        ]);
+        const [list, count] = await Promise.all([listResponse.json().catch(() => null), countResponse.json().catch(() => null)]);
+        if (!listResponse.ok) throw new Error(apiErrorMessage(list, 'Could not load notifications.'));
+        setItems((Array.isArray(list?.items) ? list.items : []).map((item) => ({ ...item, read: Boolean(item.is_read ?? item.read), type: String(item.notification_type || item.type || 'general').toLowerCase().replaceAll('_', '-'), createdAt: item.created_at || item.createdAt || '', link: item.link || '' })));
+        const countValue = Number(count?.unread_count ?? count?.count ?? count?.total_unread ?? Object.values(count || {}).find((value) => Number.isFinite(Number(value))));
+        setUnread(Number.isFinite(countValue) ? countValue : Number(list?.unread_count) || 0);
+      } catch { if (!controller.signal.aborted) { setItems([]); setUnread(0); } }
+    };
+    const refresh = () => load();
+    window.addEventListener('notifications:changed', refresh);
+    load(); return () => { controller.abort(); window.removeEventListener('notifications:changed', refresh); };
+  }, [accessToken, location.pathname]);
+
+  const openNotification = async (item, close) => {
+    if (!item.read) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/notifications/${encodeURIComponent(item.id)}/read`, { method: 'PATCH', headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' } });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(apiErrorMessage(payload, 'Could not mark notification as read.'));
+        setItems((current) => current.map((entry) => entry.id === item.id ? { ...entry, read: true } : entry));
+        setUnread((value) => Math.max(0, value - 1));
+      } catch { return; }
+    }
+    close(); if (item.link) navigate(item.link);
+  };
   return (
     <Dropdown
       trigger={({ toggle }) => (
@@ -59,7 +94,7 @@ function NotificationBell({ role, base }) {
             <Link to={`${base}/notifications`} onClick={close} className="small">View all</Link>
           </div>
           {items.slice(0, 5).map((n) => (
-            <button key={n.id} className={cx('notif-item', !n.read && 'notif-item--unread')} onClick={() => { update('notifications', n.id, { read: true }); close(); if (n.link) navigate(n.link); }}>
+            <button key={n.id} className={cx('notif-item', !n.read && 'notif-item--unread')} onClick={() => openNotification(n, close)}>
               <span className="dot" style={{ background: n.read ? 'var(--grey-400)' : 'var(--green-500)', marginTop: 8 }} />
               <span>
                 <span className="notif-item__title small" style={{ display: 'block' }}>{n.title}</span>

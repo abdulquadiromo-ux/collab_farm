@@ -57,7 +57,7 @@ const LOCAL_TEMPLATES = {
 
 export const TEMPLATES = { 'Crop Farming': PACKAGE_TEMPLATES['Crop Farming'], ...LOCAL_TEMPLATES };
 export const TEMPLATE_CATEGORIES = Object.keys(TEMPLATES);
-export const TIERS = ['Starter', 'Growth', 'Commercial', 'Custom'];
+export const TIERS = ['Starter', 'Growth', 'Commercial'];
 export const ALL_CATEGORIES = [...CATEGORIES, 'Custom'];
 
 // PRD 7.1 budget categories.

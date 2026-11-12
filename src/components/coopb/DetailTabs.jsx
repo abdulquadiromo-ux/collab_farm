@@ -50,7 +50,16 @@ export function OverviewTab({ pkg, farms }) {
 /* ------------------------------------------------------------------ Farmers */
 export function FarmersTab({ pkg }) {
   const { data } = useApp();
-  const farmers = data.farmers.filter((f) => f.allocationPackageId === pkg.id);
+  const assigned = (pkg.farmers || []).map((record) => {
+    const id = record.farmerId || record.farmer_id || record.id;
+    const cached = data.farmers.find((farmer) => farmer.id === id);
+    return cached ? { ...cached, allocatedAmount: record.allocatedAmount ?? record.allocated_amount ?? cached.allocatedAmount } : {
+      id, name: record.full_name || record.farmer_name || [record.first_name, record.last_name].filter(Boolean).join(' ') || 'Farmer',
+      farmingCategory: record.farming_category || record.crop_type || '', allocatedAmount: record.allocatedAmount ?? record.allocated_amount ?? 0,
+      status: record.verification_status || 'Pending', agreementStatus: record.agreement_status || 'Not Signed',
+    };
+  });
+  const farmers = assigned.length ? assigned : data.farmers.filter((f) => f.allocationPackageId === pkg.id);
   const columns = [
     { key: 'name', header: 'Farmer', render: (f) => <span className="strong">{f.name}</span> },
     { key: 'cropType', header: 'Crop or activity', render: (f) => f.farmingCategory || f.cropType || '-' },
@@ -125,11 +134,16 @@ export function BudgetTab({ pkg }) {
 }
 
 /* -------------------------------------------------------- Funding and investors */
-export function FundingTab({ pkg }) {
-  const { data } = useApp();
-  const invs = data.investments.filter((i) => i.packageId === pkg.id);
-  const name = (id) => data.investors.find((i) => i.id === id)?.name || 'Investor';
-  const rows = invs.map((i) => ({ ...i, investorName: name(i.investorId) }));
+export function FundingTab({ pkg, investors = [] }) {
+  const rows = investors.map((item) => ({
+    id: item.id,
+    investorName: item.investor_name || 'Investor',
+    ref: item.id || '-',
+    committed: Number(item.amount) || 0,
+    confirmed: Number(item.confirmed_amount) || 0,
+    dateInvested: item.invested_at || '',
+    status: item.status || 'Committed',
+  }));
   const columns = [
     { key: 'investorName', header: 'Investor', render: (r) => <span className="strong">{r.investorName}</span> },
     { key: 'ref', header: 'Reference', render: (r) => <span className="cell-sub">{r.ref}</span> },

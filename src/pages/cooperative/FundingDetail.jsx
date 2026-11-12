@@ -1,17 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { Banknote, Sprout, RefreshCw, CircleDot, Users, HandCoins, Pencil, Send, Undo2 } from 'lucide-react';
-import { Breadcrumb, PageHeader, Card, CardHeader, KpiStrip, Tabs, StatusPill, Banner, EmptyState, LinkButton, Button } from '../../components/ui/index.js';
+import { Banknote, Sprout, RefreshCw, CircleDot, Users, HandCoins, Pencil } from 'lucide-react';
+import { Breadcrumb, PageHeader, Card, CardHeader, KpiStrip, Tabs, StatusPill, Banner, EmptyState, LinkButton, PageSkeleton } from '../../components/ui/index.js';
 import { Photo } from '../../components/common/Photo.jsx';
 import { useApp } from '../../context/AppContext.jsx';
 import { formatNaira } from '../../utils/format.js';
-import { useCoop, usePackageActions } from '../../components/coopb/hooks.js';
-import { useSubmitFlow } from '../../components/coopb/SubmitFlow.jsx';
+import { useCoop } from '../../components/coopb/hooks.js';
 import { EDITABLE_STATUSES, PHOTO_THEME } from '../../components/coopb/constants.jsx';
 import { agreementSummary } from '../../components/coopb/logic.js';
+import { apiPackageToModel } from '../../components/coopb/logic.js';
+import { API_BASE_URL, apiErrorMessage } from '../../utils/api.js';
 import { StatusFlow, TierDot, UnverifiedBanner } from '../../components/coopb/Common.jsx';
 import { OverviewTab, FarmersTab, FundingTab, TranchesTab } from '../../components/coopb/DetailTabs.jsx';
-import { WithdrawModal } from '../../components/coopb/Modals.jsx';
 import '../../styles/pages/coopb.css';
 
 const TABS = [
@@ -23,19 +23,47 @@ const TABS = [
 
 export default function FundingDetail() {
   const { id } = useParams();
-  const { data, user } = useApp();
+  const { data, accessToken, patchData } = useApp();
   const { verified, farms } = useCoop();
   const [params, setParams] = useSearchParams();
-  const { withdrawPackage } = usePackageActions();
-  const { ask, dialog } = useSubmitFlow({ verified });
-  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [remotePackage, setRemotePackage] = useState(null);
+  const [remoteInvestors, setRemoteInvestors] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
-  const pkg = data.packages.find((p) => p.id === id && p.coopId === user.orgId);
+  useEffect(() => {
+    const controller = new AbortController();
+    const load = async () => {
+      setLoading(true); setLoadError('');
+      if (!accessToken) { setLoadError('Your session has expired. Sign in again to view this package.'); setLoading(false); return; }
+      try {
+        const headers = { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' };
+        const [packageResponse, investorsResponse] = await Promise.all([
+          fetch(`${API_BASE_URL}/packages/${encodeURIComponent(id)}`, { headers, signal: controller.signal }),
+          fetch(`${API_BASE_URL}/packages/${encodeURIComponent(id)}/investors`, { headers, signal: controller.signal }),
+        ]);
+        const packagePayload = await packageResponse.json().catch(() => null);
+        if (!packageResponse.ok) throw new Error(apiErrorMessage(packagePayload, `Could not load package (${packageResponse.status}).`));
+        const model = apiPackageToModel(packagePayload);
+        setRemotePackage(model);
+        patchData((current) => ({ packages: [...current.packages.filter((item) => item.id !== model.id), model] }));
+        const investorsPayload = await investorsResponse.json().catch(() => []);
+        if (!investorsResponse.ok) throw new Error(apiErrorMessage(investorsPayload, `Could not load package investors (${investorsResponse.status}).`));
+        setRemoteInvestors(Array.isArray(investorsPayload) ? investorsPayload : []);
+      } catch (error) { if (error.name !== 'AbortError') setLoadError(error.message || 'Could not load package details.'); }
+      finally { if (!controller.signal.aborted) setLoading(false); }
+    };
+    load();
+    return () => controller.abort();
+  }, [accessToken, id, patchData]);
+
+  const pkg = remotePackage?.id === id ? remotePackage : null;
+  if (loading) return <PageSkeleton />;
   if (!pkg) {
     return (
       <div className="page">
         <EmptyState title="Package not found" action={<LinkButton to="/coop/funding">Back to Funding Packages</LinkButton>}>
-          This package does not exist or belongs to another cooperative.
+          {loadError || 'This package does not exist or belongs to another cooperative.'}
         </EmptyState>
       </div>
     );
@@ -66,11 +94,10 @@ export default function FundingDetail() {
           <>
             <span className="coopb-tier-chip"><TierDot tier={tierName} />{tierName}</span>
             {editable && <LinkButton to={`/coop/funding/new?edit=${pkg.id}`} variant="outline"><Pencil size={16} />Edit</LinkButton>}
-            {editable && <Button onClick={() => ask(pkg)} disabled={!verified}><Send size={16} />Submit for review</Button>}
-            {pkg.status === 'Submitted' && <Button variant="danger-outline" onClick={() => setWithdrawOpen(true)}><Undo2 size={16} />Withdraw</Button>}
           </>
         )}
       />
+      {loadError && <Banner tone="danger" title="Could not load all package information">{loadError}</Banner>}
 
       {!verified && <UnverifiedBanner what="submit funding requests or change budgets" />}
 
@@ -114,11 +141,9 @@ export default function FundingDetail() {
       />
       {tab === 'overview' && <OverviewTab pkg={pkg} farms={farms} />}
       {tab === 'farmers' && <FarmersTab pkg={pkg} />}
-      {tab === 'funding' && <FundingTab pkg={pkg} />}
+      {tab === 'funding' && <FundingTab pkg={pkg} investors={remoteInvestors} />}
       {tab === 'tranches' && <TranchesTab pkg={pkg} agreements={agreements} />}
 
-      {dialog}
-      <WithdrawModal open={withdrawOpen} onClose={() => setWithdrawOpen(false)} pkg={pkg} onConfirm={(reason) => withdrawPackage(pkg, reason)} />
     </div>
   );
 }

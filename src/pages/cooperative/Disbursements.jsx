@@ -1,204 +1,238 @@
-import { useCallback, useMemo } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Banknote, Clock3, CalendarDays, Files, Eye, Copy, ExternalLink } from 'lucide-react';
-import { useApp, useSimulatedLoad } from '../../context/AppContext.jsx';
-import { PageHeader, KpiStrip, DataTable, Avatar, Button, EmptyState, Modal, InfoList, StatusPill } from '../../components/ui/index.js';
+import { useApp } from '../../context/AppContext.jsx';
+import { PageHeader, KpiStrip, DataTable, Avatar, Button, EmptyState, Modal, InfoList, StatusPill, Banner, Pagination, SearchInput, FilterSelect, SelectField } from '../../components/ui/index.js';
 import RowMenu from '../../components/coopc/RowMenu.jsx';
-import { useCoop, daysFromToday, sumBy, trancheShort } from '../../components/coopc/helpers.js';
 import { formatNaira, formatDate } from '../../utils/format.js';
-import { trancheAmounts } from '../../components/coopb/logic.js';
+import { API_BASE_URL, apiErrorMessage } from '../../utils/api.js';
 import '../../styles/pages/coopc.css';
 import '../../styles/pages/coopb.css';
 
-const STATUS_OPTIONS = ['Disbursed', 'Reviewing', 'Pending', 'Rejected'];
-const PERIODS = [
-  { value: 'month', label: 'This month' },
-  { value: '30', label: 'Last 30 days' },
-  { value: '90', label: 'Last 90 days' },
-];
-const currentMonth = new Date().toISOString().slice(0, 7);
-const inPeriod = (date, period) => {
-  const d = daysFromToday(date);
-  if (d == null) return false;
-  if (period === 'month') return String(date).slice(0, 7) === currentMonth;
-  return d <= 0 && d >= -Number(period);
-};
+const PAGE_SIZE = 10;
+const STATUSES = ['PENDING', 'REVIEWING', 'DISBURSED', 'REJECTED', 'COMPLETED', 'FAILED'];
+const PACKAGE_TYPES = ['CROP_FARMING', 'FISHERY', 'MIXED_FARMING', 'LIVESTOCK', 'POULTRY', 'CUSTOM'];
+const label = (value) => String(value || '—').replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+const amount = (value) => Number(value) || 0;
+
+function mapDisbursement(item = {}) {
+  const farmer = item.farmer || {};
+  const pkg = item.package || {};
+  return {
+    ...item,
+    id: item.id,
+    farmer,
+    pkg,
+    recipientName: farmer.full_name || item.farmer_name || item.recipient_name || 'Farmer',
+    farmerCode: farmer.farmer_code || item.farmer_code || '',
+    farmerId: farmer.id || item.farmer_id || '',
+    avatar: farmer.avatar_url || item.farmer_avatar || '',
+    packageId: pkg.id || item.package_id || '',
+    pkgName: pkg.title || item.package_title || 'Package',
+    pkgCategory: pkg.category || item.package_category || item.package_type || '—',
+    tranche: pkg.current_tranche || item.current_tranche || '—',
+    amount: amount(item.amount),
+    date: item.disbursement_date || item.date || '',
+    ref: item.transaction_reference || item.reference || '—',
+    status: String(item.status || 'PENDING').toUpperCase(),
+    recordedBy: item.recorded_by_name || '',
+  };
+}
 
 export default function Disbursements() {
-  const { data, toast } = useApp();
-  const { packageIds, pkgById, packages } = useCoop();
+  const { accessToken, toast } = useApp();
   const navigate = useNavigate();
-  const loading = useSimulatedLoad(350);
-  const [params, setParams] = useSearchParams();
-  const viewId = params.get('view');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [metrics, setMetrics] = useState(null);
+  const [metricsError, setMetricsError] = useState('');
+  const [items, setItems] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [packageType, setPackageType] = useState('');
+  const [status, setStatus] = useState('');
+  const [listLoading, setListLoading] = useState(true);
+  const [listError, setListError] = useState('');
+  const [selected, setSelected] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState('');
+  const [nextStatus, setNextStatus] = useState('PENDING');
+  const [savingStatus, setSavingStatus] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const detailId = searchParams.get('view');
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  const closeView = useCallback(() => setParams((p) => { const n = new URLSearchParams(p); n.delete('view'); return n; }, { replace: true }), [setParams]);
-  const copyRef = (ref) => {
-    const done = () => toast(`Reference ${ref} copied`, 'info');
-    const failed = () => toast(`Could not copy it automatically. The reference is ${ref}`, 'info');
-    try { navigator.clipboard.writeText(ref).then(done, failed); } catch { failed(); }
-  };
-  const openView = (id) => setParams((p) => { const n = new URLSearchParams(p); n.set('view', id); return n; });
+  useEffect(() => {
+    const timer = setTimeout(() => { setPage(1); setSearchQuery(search.trim()); }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
-  const rows = useMemo(
-    () => data.disbursements
-      .filter((d) => packageIds.has(d.packageId))
-      .map((d) => {
-        const pkg = pkgById[d.packageId];
-        return {
-          ...d,
-          pkg,
-          pkgName: pkg?.name || 'Unknown package',
-          pkgCategory: pkg?.category || '-',
-          tranche: data.tranches.find((t) => t.id === d.trancheId && t.packageId === d.packageId) || null,
-        };
-      }),
-    [data.disbursements, data.tranches, packageIds, pkgById],
-  );
-
-  const kpi = useMemo(() => {
-    const by = (s) => rows.filter((r) => r.status === s);
-    const cell = (list) => ({ value: sumBy(list, (r) => r.amount), count: list.length });
-    const disbursed = by('Disbursed');
-    const pending = [...by('Pending'), ...by('Reviewing')];
-    return {
-      disbursed: cell(disbursed),
-      pending: cell(pending),
-      thisMonth: cell(disbursed.filter((r) => String(r.date).slice(0, 7) === currentMonth)),
-      totalCount: rows.length,
+  useEffect(() => {
+    const controller = new AbortController();
+    const load = async () => {
+      setMetricsError('');
+      if (!accessToken) { setMetricsError('Your session has expired. Sign in again to view disbursements.'); return; }
+      try {
+        const response = await fetch(`${API_BASE_URL}/disbursements/metrics`, { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' }, signal: controller.signal });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(apiErrorMessage(payload, `Could not load disbursement metrics (${response.status}).`));
+        setMetrics(payload || {});
+      } catch (error) { if (error.name !== 'AbortError') setMetricsError(error.message || 'Could not load disbursement metrics.'); }
     };
-  }, [rows]);
+    load();
+    return () => controller.abort();
+  }, [accessToken, reloadKey]);
 
-  const selected = viewId ? rows.find((r) => r.id === viewId) : null;
-  const categories = [...new Set(rows.map((r) => r.pkgCategory))].filter((c) => c && c !== '-');
-  const plural = (n) => `${n} ${n === 1 ? 'payment' : 'payments'}`;
+  useEffect(() => {
+    const controller = new AbortController();
+    const load = async () => {
+      setListLoading(true); setListError('');
+      if (!accessToken) { setListError('Your session has expired. Sign in again to view disbursements.'); setListLoading(false); return; }
+      const query = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE) });
+      if (searchQuery) query.set('search', searchQuery);
+      if (packageType) query.set('package_type', packageType);
+      if (status) query.set('status', status);
+      try {
+        const response = await fetch(`${API_BASE_URL}/disbursements?${query}`, { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' }, signal: controller.signal });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(apiErrorMessage(payload, `Could not load disbursements (${response.status}).`));
+        setItems((Array.isArray(payload?.items) ? payload.items : []).map(mapDisbursement));
+        setTotal(Number(payload?.total) || 0);
+      } catch (error) { if (error.name !== 'AbortError') { setItems([]); setTotal(0); setListError(error.message || 'Could not load disbursements.'); } }
+      finally { if (!controller.signal.aborted) setListLoading(false); }
+    };
+    load();
+    return () => controller.abort();
+  }, [accessToken, page, searchQuery, packageType, status, reloadKey]);
 
-  const columns = [
-    {
-      key: 'recipientName', header: 'Farmers', sortable: true,
-      render: (r) => (
-        <div className="cell-person">
-          <Avatar name={r.recipientName} />
-          <div>
-            <div className="strong">{r.recipientName}</div>
-            <div className="cell-sub">{r.recipientType}</div>
-          </div>
+  useEffect(() => {
+    if (!detailId) { setSelected(null); setDetailError(''); return undefined; }
+    const controller = new AbortController();
+    const load = async () => {
+      setDetailLoading(true); setDetailError('');
+      if (!accessToken) { setDetailError('Your session has expired. Sign in again to view this disbursement.'); setDetailLoading(false); return; }
+      try {
+        const response = await fetch(`${API_BASE_URL}/disbursements/${encodeURIComponent(detailId)}`, { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' }, signal: controller.signal });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(apiErrorMessage(payload, `Could not load disbursement details (${response.status}).`));
+        setSelected(mapDisbursement(payload));
+        setNextStatus(String(payload?.status || 'PENDING').toUpperCase());
+      } catch (error) { if (error.name !== 'AbortError') setDetailError(error.message || 'Could not load disbursement details.'); }
+      finally { if (!controller.signal.aborted) setDetailLoading(false); }
+    };
+    load();
+    return () => controller.abort();
+  }, [accessToken, detailId]);
+
+  const openDetail = (row) => setSearchParams((current) => { const next = new URLSearchParams(current); next.set('view', row.id); return next; });
+  const closeDetail = () => setSearchParams((current) => { const next = new URLSearchParams(current); next.delete('view'); return next; });
+  const copyRef = async (ref) => {
+    try { await navigator.clipboard.writeText(ref); toast(`Reference ${ref} copied`, 'info'); }
+    catch { toast(`Could not copy it automatically. The reference is ${ref}`, 'info'); }
+  };
+  const updateStatus = async () => {
+    if (!selected || savingStatus) return;
+    setSavingStatus(true); setDetailError('');
+    try {
+      if (!accessToken) throw new Error('Your session has expired. Sign in again to update this disbursement.');
+      const response = await fetch(`${API_BASE_URL}/disbursements/${encodeURIComponent(selected.id)}/status`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(apiErrorMessage(payload, `Could not update disbursement status (${response.status}).`));
+      setSelected((current) => current ? { ...current, status: nextStatus } : current);
+      setItems((current) => current.map((row) => row.id === selected.id ? { ...row, status: nextStatus } : row));
+      setReloadKey((key) => key + 1);
+      toast('Disbursement status updated', 'success');
+    } catch (error) { setDetailError(error.message || 'Could not update disbursement status.'); }
+    finally { setSavingStatus(false); }
+  };
+  const resetFilters = () => { setSearch(''); setSearchQuery(''); setPackageType(''); setStatus(''); setPage(1); };
+
+  const columns = useMemo(() => [
+    { key: 'recipientName', header: 'Farmers', render: (row) => <div className="cell-person"><Avatar name={row.recipientName} src={row.avatar} /><div><div className="strong">{row.recipientName}</div><div className="cell-sub">{row.farmerCode || 'Farmer'}</div></div></div> },
+    { key: 'pkgName', header: 'Package', render: (row) => <span className="strong">{row.pkgName}</span> },
+    { key: 'amount', header: 'Amount disbursed', render: (row) => formatNaira(row.amount) },
+    { key: 'date', header: 'Disbursement date', className: 'nowrap', render: (row) => row.date ? formatDate(row.date) : '—' },
+    { key: 'pkgCategory', header: 'Package category', render: (row) => label(row.pkgCategory) },
+    { key: 'tranche', header: 'Current tranche', render: (row) => label(row.tranche) },
+    { key: 'status', header: 'Status', render: (row) => <StatusPill>{label(row.status)}</StatusPill> },
+    { key: 'actions', header: 'Action', render: (row) => <div className="row" style={{ gap: 4 }}><Button variant="outline" size="sm" onClick={(event) => { event.stopPropagation(); openDetail(row); }}>View</Button><RowMenu label={`Actions for ${row.recipientName}`} items={[{ label: 'View details', icon: <Eye size={16} />, onClick: () => openDetail(row) }, ...(row.packageId ? [{ label: 'Open funding package', icon: <ExternalLink size={16} />, onClick: () => navigate(`/coop/funding/${row.packageId}`) }] : []), ...(row.ref !== '—' ? [{ label: 'Copy reference', icon: <Copy size={16} />, onClick: () => copyRef(row.ref) }] : [])]} /></div> },
+  ], [navigate]);
+
+  const trancheItems = Array.isArray(selected?.pkg?.tranches) ? selected.pkg.tranches : Array.isArray(selected?.tranches) ? selected.tranches : [];
+  const currentTranche = selected?.pkg?.current_tranche ?? selected?.current_tranche;
+  const isCurrentTranche = (tranche, index) => {
+    if (tranche?.is_current === true || tranche?.current === true) return true;
+    const statusValue = String(tranche?.status || '').toUpperCase();
+    if (['CURRENT', 'IN_PROGRESS', 'ACTIVE'].includes(statusValue)) return true;
+    if (currentTranche == null || currentTranche === '') return false;
+    const token = typeof currentTranche === 'object'
+      ? currentTranche.id ?? currentTranche.name ?? currentTranche.number ?? currentTranche.tranche_number
+      : currentTranche;
+    return [tranche?.id, tranche?.name, tranche?.number, tranche?.tranche_number, index + 1]
+      .some((value) => value != null && String(value).toLowerCase() === String(token).toLowerCase());
+  };
+
+  const detail = selected && <Modal open onClose={closeDetail} title="Disbursement details" wide white footer={<Button variant="outline" onClick={closeDetail}>Close</Button>}>
+    {detailLoading ? <p className="muted">Loading disbursement details…</p> : <div className="stack">
+      {detailError && <Banner tone="warn" title="Disbursement request failed">{detailError}</Banner>}
+      <InfoList compact items={[
+        ['Reference', selected.ref], ['Farmer', selected.recipientName], ['Farmer code', selected.farmerCode || '—'],
+        ['Package', selected.pkgName], ['Status', <StatusPill key="status">{label(selected.status)}</StatusPill>],
+        ['Disbursement amount', formatNaira(selected.amount)], ['Disbursement date', selected.date ? formatDate(selected.date) : '—'],
+        ['Package category', label(selected.pkgCategory)], ['Recorded by', selected.recordedBy || '—'],
+      ]} />
+      <div className="row-wrap">
+        <SelectField label="Disbursement status" value={nextStatus} onChange={(event) => setNextStatus(event.target.value)} options={STATUSES.map((value) => ({ value, label: label(value) }))} />
+        <Button onClick={updateStatus} disabled={savingStatus || nextStatus === selected.status}>{savingStatus ? 'Saving…' : 'Save status'}</Button>
+      </div>
+      <section className="stack-sm" aria-label="Package tranches">
+        <h3 className="card__title">Package tranches</h3>
+        {trancheItems.length ? <div className="coopb-six">
+          {trancheItems.map((tranche, index) => {
+            const current = isCurrentTranche(tranche, index);
+            const trancheNumber = tranche.number ?? tranche.tranche_number ?? index + 1;
+            const trancheName = tranche.name || tranche.title || `Tranche ${trancheNumber}`;
+            const trancheAmount = amount(tranche.amount ?? tranche.amount_to_release ?? tranche.release_amount);
+            return <div key={tranche.id || trancheNumber} className={`coopb-six__row${current ? ' coopb-six__row--key' : ''}`}>
+              <span className="coopb-six__no">{trancheNumber}</span>
+              <div><div className="strong small">T{trancheNumber} {trancheName}</div><div className="caption muted">{current ? 'Current tranche' : label(tranche.status || 'Not current')}</div></div>
+              <div className="coopb-six__val">{formatNaira(trancheAmount)}</div>
+            </div>;
+          })}
+        </div> : <p className="muted small">No tranche details are available for this package.</p>}
+      </section>
+      <div className="stack">
+        <div className="row">{selected.farmerId && <Button variant="outline" onClick={() => navigate(`/coop/farmers/${selected.farmerId}`)}>Open farmer</Button>}
+          {selected.packageId && <Button variant="outline" onClick={() => navigate(`/coop/funding/${selected.packageId}`)}>View package</Button>}
         </div>
-      ),
-    },
-    { key: 'pkgName', header: 'Package', sortable: true },
-    { key: 'amount', header: 'Amount disbursed', sortable: true, render: (r) => formatNaira(r.amount) },
-    { key: 'date', header: 'Disbursement date', sortable: true, className: 'nowrap', render: (r) => formatDate(r.date) },
-    { key: 'pkgCategory', header: 'Package category', sortable: true },
-    { key: 'tranche', header: 'Current tranche', render: (r) => r.tranche ? `${trancheShort(r.tranche)} (${r.tranche.status})` : '—' },
-    {
-      key: 'actions', header: 'Action',
-      render: (r) => (
-        <div className="row" style={{ gap: 4 }}>
-          <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); openView(r.id); }}>View</Button>
-          <RowMenu
-            label={`Actions for ${r.recipientName}`}
-            items={[
-              { label: 'View details', icon: <Eye size={16} />, onClick: () => openView(r.id) },
-              { label: 'Open funding package', icon: <ExternalLink size={16} />, onClick: () => navigate(`/coop/funding/${r.packageId}`) },
-              { label: 'Copy reference', icon: <Copy size={16} />, onClick: () => copyRef(r.ref) },
-            ]}
-          />
+      </div>
+    </div>}
+  </Modal>;
+
+  return <div className="page coopc-page">
+    <PageHeader title="Disbursements" subtitle="Track funds released from your funded packages to farmers, suppliers and the cooperative." />
+    {metricsError && <Banner tone="warn" title="Disbursement metrics unavailable">{metricsError}</Banner>}
+    <KpiStrip cells={[
+      { icon: <Banknote size={18} />, label: 'Total Disbursed', value: metrics ? formatNaira(amount(metrics.total_disbursed)) : '—', sub: `${Number(metrics?.total_disbursed_growth_pct) || 0}% growth` },
+      { icon: <Clock3 size={18} />, label: 'Pending Disbursement', value: metrics ? formatNaira(amount(metrics.pending_disbursement_amount)) : '—', sub: `${Number(metrics?.pending_disbursement_count) || 0} awaiting processing` },
+      { icon: <CalendarDays size={18} />, label: 'This Month Disbursement', value: metrics ? formatNaira(amount(metrics.this_month_amount)) : '—', sub: `${Number(metrics?.this_month_growth_pct) || 0}% growth this month` },
+      { icon: <Files size={18} />, label: 'Total Number of Disbursements', value: metrics ? amount(metrics.total_disbursements_count) : '—', sub: 'All recorded disbursements' },
+    ]} />
+    {listError ? <EmptyState title="Disbursements unavailable" action={<Button onClick={() => setReloadKey((key) => key + 1)}>Try again</Button>}>{listError}</EmptyState> : <div className="coopb-inv-table">
+      <div className="table-toolbar"><div className="row-wrap grow"><SearchInput value={search} onChange={setSearch} placeholder="Search farmer, package or transaction reference" /></div>
+        <div className="table-toolbar__filters"><FilterSelect value={packageType} onChange={(value) => { setPackageType(value); setPage(1); }} allLabel="All Package Types" options={PACKAGE_TYPES.map((value) => ({ value, label: label(value) }))} />
+          <FilterSelect value={status} onChange={(value) => { setStatus(value); setPage(1); }} allLabel="All Status" options={STATUSES.map((value) => ({ value, label: label(value) }))} />
+          {(search || packageType || status) && <Button variant="outline" size="sm" onClick={resetFilters}>Clear</Button>}
         </div>
-      ),
-    },
-  ];
-
-  const filters = [
-    { key: 'pkgCategory', allLabel: 'All Package Types', options: categories },
-    { key: 'status', allLabel: 'All Status', options: STATUS_OPTIONS },
-    { key: 'period', allLabel: 'All dates', options: PERIODS, match: (r, v) => inPeriod(r.date, v) },
-  ];
-
-  const detail = selected && (() => {
-    const done = selected.status === 'Disbursed';
-    const farmerId = selected.recipientType === 'Farmer' ? selected.recipientId : null;
-    const recordedTranches = data.tranches.filter((t) => t.packageId === selected.packageId).sort((a, b) => a.number - b.number);
-    const tranches = recordedTranches.length ? recordedTranches : trancheAmounts(selected.pkg?.amount || 0, selected.pkg?.category).map((t) => ({ ...t, status: 'Locked' }));
-    const currentTranche = tranches.find((t) => t.id === selected.trancheId) || tranches.find((t) => t.status !== 'Released');
-    return (
-      <Modal
-        open
-        onClose={closeView}
-        title="Disbursement details"
-        wide
-        white
-        footer={(
-          <>
-            <Button variant="outline" onClick={closeView}>Close</Button>
-            {farmerId && <Button variant="outline" onClick={() => navigate(`/coop/farmers/${farmerId}`)}>Open farmer</Button>}
-            <Link className="btn btn--primary" to={`/coop/funding/${selected.packageId}`} onClick={closeView}>View package</Link>
-          </>
-        )}
-      >
-        <div className="stack">
-          <InfoList compact items={[
-            ['Reference', selected.ref],
-            ['Package', selected.pkgName],
-            ['Status', <StatusPill key="status">{selected.status}</StatusPill>],
-            ['Disbursement amount', formatNaira(selected.amount)],
-            ['Disbursement date', formatDate(selected.date)],
-            ['Package category', selected.pkgCategory || '-'],
-          ]} />
-          <div className="coopb-six" aria-label="Package tranches">
-            {tranches.map((tranche) => (
-              <div key={tranche.id || tranche.number} className={`coopb-six__row${tranche.id === currentTranche?.id || (!tranche.id && tranche.number === currentTranche?.number) ? ' coopb-six__row--key' : ''}`}>
-                <span className="coopb-six__no">{tranche.number}</span>
-                <div>
-                  <div className="strong small">T{tranche.number} {tranche.name}</div>
-                  <div className="caption muted">{tranche.status || 'Locked'}{(tranche.id === currentTranche?.id || (!tranche.id && tranche.number === currentTranche?.number)) ? ' · Current tranche' : ''}</div>
-                </div>
-                <div className="coopb-six__val">{formatNaira(tranche.amount)}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </Modal>
-    );
-  })();
-
-  return (
-    <div className="page coopc-page">
-      <PageHeader
-        title="Disbursements"
-        subtitle="Track funds released from your funded packages to farmers, suppliers and the cooperative."
-      />
-
-      <KpiStrip
-        cells={[
-          { icon: <Banknote size={18} />, label: 'Total Disbursed', value: loading ? '...' : formatNaira(kpi.disbursed.value), sub: plural(kpi.disbursed.count) + ' confirmed paid' },
-          { icon: <Clock3 size={18} />, label: 'Pending Disbursement', value: loading ? '...' : formatNaira(kpi.pending.value), sub: plural(kpi.pending.count) + ' awaiting approval or review' },
-          { icon: <CalendarDays size={18} />, label: 'This Month Disbursement', value: loading ? '...' : formatNaira(kpi.thisMonth.value), sub: plural(kpi.thisMonth.count) + ' paid this month' },
-          { icon: <Files size={18} />, label: 'Total Number of Disbursements', value: loading ? '...' : kpi.totalCount, sub: 'All recorded disbursements' },
-        ]}
-      />
-
-      <DataTable
-        columns={columns}
-        rows={rows}
-        loading={loading}
-        searchKeys={(r) => [r.pkgName, r.pkgCategory, r.recipientName, r.purpose, r.ref].join(' ')}
-        searchPlaceholder="Search by recipient, purpose, package or reference"
-        filters={filters}
-        defaultSort={{ key: 'date', dir: 'desc' }}
-        onRowClick={(r) => openView(r.id)}
-        totalLabel="disbursements"
-        emptyTitle="No disbursements yet"
-        emptyText="Payments to farmers, suppliers and your cooperative will appear here once a request is made."
-      />
-
-      {!loading && packages.length === 0 && (
-        <EmptyState title="No funding packages yet" action={<Link className="btn btn--primary" to="/coop/funding">Go to Funding</Link>}>
-          Disbursements are made from a funded package. Create one first.
-        </EmptyState>
-      )}
-
-      {detail}
-    </div>
-  );
+      </div>
+      <DataTable columns={columns} rows={items} loading={listLoading} hideFooter bare pageSize={PAGE_SIZE} emptyTitle="No disbursements yet" emptyText="Recorded disbursements will appear here." onRowClick={openDetail} />
+      {!listLoading && total > 0 && <div className="pagination-bar"><span className="muted">Showing {(page - 1) * PAGE_SIZE + 1} - {Math.min(page * PAGE_SIZE, total)} of {total} disbursements</span><Pagination page={page} pages={pages} onPage={setPage} /></div>}
+    </div>}
+    {detail}
+  </div>;
 }

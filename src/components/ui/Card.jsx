@@ -1,4 +1,4 @@
-import { ArrowUp, ArrowDown, Check, Inbox } from 'lucide-react';
+import { ArrowUp, ArrowDown, Check, Inbox, AlertTriangle, Info, CheckCircle2 } from 'lucide-react';
 import { cx, initials } from '../../utils/format.js';
 import { statusTone } from '../../utils/status.js';
 
@@ -96,8 +96,18 @@ export function Chip({ children, bg, fg, border }) {
   return <span className="chip" style={{ background: bg, color: fg, borderColor: border }}>{children}</span>;
 }
 
-export function Banner() {
-  return null;
+export function Banner({ tone = 'info', title, children, className, ...rest }) {
+  const Icon = tone === 'danger' || tone === 'warn' ? AlertTriangle : tone === 'success' || tone === 'green' ? CheckCircle2 : Info;
+  const urgent = tone === 'danger' || tone === 'warn';
+  return (
+    <div className={cx('banner', `banner--${tone}`, className)} role={urgent ? 'alert' : 'status'} {...rest}>
+      <Icon size={18} aria-hidden="true" />
+      <div>
+        {title && <strong style={{ display: 'block', marginBottom: 2 }}>{title}</strong>}
+        {children}
+      </div>
+    </div>
+  );
 }
 
 export function Progress({ value, tone, label }) {

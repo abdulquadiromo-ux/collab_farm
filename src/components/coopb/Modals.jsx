@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { Modal, Button, MoneyField, TextAreaField, Banner, InfoList, StatusPill } from '../ui/index.js';
 import { simulate } from '../../context/AppContext.jsx';
 import { formatNaira, formatDate } from '../../utils/format.js';
-import { trancheAmounts } from './logic.js';
 
 /* Request a budget change on an approved package. Creates an application of type "Budget change". */
 export function BudgetChangeModal({ open, onClose, pkg, onSubmit }) {
@@ -93,37 +92,50 @@ export function WithdrawModal({ open, onClose, pkg, onConfirm }) {
 }
 
 /* Investment detail: package tranches with the next unreleased tranche highlighted. */
-export function InvestmentModal({ open, onClose, row }) {
+export function InvestmentModal({ open, onClose, row, loading = false, error = '' }) {
   if (!row) return null;
-  const tranches = row.tranches?.length ? row.tranches : trancheAmounts(row.pkg?.amount || 0, row.pkg?.category).map((t) => ({ ...t, status: 'Locked' }));
-  const currentTranche = tranches.find((t) => t.status !== 'Released');
-  const notConfirmed = row.committed - row.confirmed;
+  const tranches = Array.isArray(row.tranches) ? row.tranches : [];
   return (
     <Modal open={open} onClose={onClose} title="Investment details" wide white footer={(
       <>
         <Button variant="outline" onClick={onClose}>Close</Button>
-        <Link className="btn btn--primary" to={`/coop/funding/${row.packageId}`} onClick={onClose}>View package</Link>
+        {row.packageId && <Link className="btn btn--primary" to={`/coop/funding/${row.packageId}`} onClick={onClose}>View package</Link>}
       </>
     )}>
       <div className="stack">
-        <InfoList compact items={[
-          ['Reference', row.ref], ['Package', row.pkg?.name], ['Investor', row.investorName],
-          ['Status', <StatusPill key="s">{row.status}</StatusPill>], ['Date committed', formatDate(row.dateInvested)],
-          ['Expected settlement', formatDate(row.expectedSettlementDate)],
-        ]} />
-        {notConfirmed <= 0 && (
-          <Banner tone="success" title="Fully confirmed">The financial partner has confirmed the full committed amount. It is released to the project only in stages, after evidence is approved.</Banner>
-        )}
-        <div className="coopb-six" aria-label="Package tranches">
-          {tranches.map((tranche) => (
-            <div key={tranche.id || tranche.number} className={`coopb-six__row${tranche.number === currentTranche?.number ? ' coopb-six__row--key' : ''}`}>
-              <span className="coopb-six__no">{tranche.number}</span>
-              <div><div className="strong small">T{tranche.number} {tranche.name}</div><div className="caption muted">{tranche.purpose}</div><div className="caption muted">{tranche.status || 'Locked'}</div></div>
+        {loading && <div className="muted">Loading investment details…</div>}
+        {error && <Banner tone="danger" title="Investment details unavailable">{error}</Banner>}
+        {!loading && !error && <>
+          <InfoList compact items={[
+            ['Reference', row.transaction_reference || row.reference || '—'],
+            ['Investor', row.investor_name || row.investorName || 'Investor'],
+            ['Investor ID', row.investor_id_code || row.investorIdCode || '—'],
+            ['Package', row.package_title || row.packageName || 'Package'],
+            ['Category', row.package_category || row.packageCategory || '—'],
+            ['Amount invested', formatNaira(row.amount_invested ?? row.amount)],
+            ['Payment method', row.payment_method || '—'],
+            ['Date invested', row.date_invested || row.dateInvested ? formatDate(row.date_invested || row.dateInvested) : '—'],
+            ['Investment status', <StatusPill key="status">{row.status || '—'}</StatusPill>],
+            ['Settlement status', row.settlement_status || '—'],
+            ['Expected settlement date', row.expected_settlement_date || row.expectedSettlementDate ? formatDate(row.expected_settlement_date || row.expectedSettlementDate) : '—'],
+            ['Expected settlement amount', formatNaira(row.expected_settlement_amount ?? row.expectedSettlementAmount)],
+            ['Farming cycle', row.farming_cycle || '—'],
+            ['Farmers supported', row.farmers_supported ?? '—'],
+            ['Farming progress', row.farming_progress != null ? `${row.farming_progress}%` : '—'],
+            ['Package total amount', formatNaira(row.package_total_amount)],
+            ['Total released', formatNaira(row.total_released)],
+            ['Release progress', row.release_percentage != null ? `${row.release_percentage}%` : '—'],
+            ['Current stage', row.current_stage || '—'],
+          ]} />
+          {tranches.length > 0 && <section className="stack-sm"><h3 className="strong">Tranches</h3><div className="coopb-six" aria-label="Investment tranches">
+            {tranches.map((tranche, index) => <div key={tranche.id || tranche.number || index} className="coopb-six__row">
+              <span className="coopb-six__no">{tranche.number ?? index + 1}</span>
+              <div><div className="strong small">{tranche.name || tranche.title || `Tranche ${index + 1}`}</div><div className="caption muted">{tranche.purpose || tranche.description || ''}</div><div className="caption muted">{tranche.status || '—'}</div></div>
               <div className="coopb-six__val">{formatNaira(tranche.amount)}</div>
-            </div>
-          ))}
-        </div>
-        <p className="caption muted">For privacy, investor contact details are never shown to cooperatives. Expected settlement is a planned date, not a guarantee.</p>
+            </div>)}
+          </div></section>}
+          <p className="caption muted">Investor contact details are not shown to the cooperative.</p>
+        </>}
       </div>
     </Modal>
   );

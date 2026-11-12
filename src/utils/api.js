@@ -9,7 +9,8 @@ export function apiErrorMessage(payload, fallback) {
 
 export function accountFromAuthResponse(response, token, username, fallback = {}) {
   const claims = decodeJwt(token) || {};
-  const profile = response?.user || response?.account || response?.profile || response?.data?.user || response?.data || {};
+  const profile = response?.user || response?.account || response?.data?.user || response?.data ||
+    (response?.role || response?.user_role || response?.account_type ? response : response?.profile) || response || {};
   const role = normaliseRole(profile.role || profile.user_role || profile.account_type || response?.role || response?.user_role || response?.account_type || claims.role || claims.user_role || claims.account_type || fallback.role);
   if (!role) return null;
   const id = String(profile.id || profile.user_id || claims.user_id || claims.sub || fallback.id || username);
