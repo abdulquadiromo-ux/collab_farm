@@ -1,11 +1,9 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Eye, Pencil, Send, Copy, Plus } from 'lucide-react';
+import { ArrowRight, Eye, Pencil, Plus } from 'lucide-react';
 import { DataTable, StatusPill, KebabMenu, LinkButton, Button } from '../ui/index.js';
 import { formatNaira, formatDate, formatNumber } from '../../utils/format.js';
 import { EDITABLE_STATUSES } from './constants.jsx';
-import { usePackageActions } from './hooks.js';
-import { useSubmitFlow } from './SubmitFlow.jsx';
 import { TierDot } from './Common.jsx';
 
 /**
@@ -13,9 +11,6 @@ import { TierDot } from './Common.jsx';
  * View, Edit (Draft or Changes Requested), Submit for review and Duplicate as draft.
  */
 export default function PackagesTable({ rows, verified, emptyTitle, emptyText, emptyAction, totalLabel = 'packages', pageSize = 8, showCategory = true }) {
-  const { duplicateAsDraft } = usePackageActions();
-  const { ask: askSubmit, dialog } = useSubmitFlow({ verified });
-
   const columns = [
     {
       key: 'name', header: 'Package', sortable: true,
@@ -38,8 +33,6 @@ export default function PackagesTable({ rows, verified, emptyTitle, emptyText, e
         const editable = EDITABLE_STATUSES.includes(p.status);
         const items = [{ label: 'View', icon: <Eye size={16} />, to: `/coop/funding/${p.id}` }];
         if (editable) items.push({ label: 'Edit', icon: <Pencil size={16} />, to: `/coop/funding/new?edit=${p.id}` });
-        if (editable && verified) items.push({ label: 'Submit for review', icon: <Send size={16} />, onClick: () => askSubmit(p) });
-        if (verified) items.push({ label: 'Duplicate as draft', icon: <Copy size={16} />, onClick: () => duplicateAsDraft(p) });
         return (
           <div className="row" style={{ gap: 8 }}>
             <LinkButton to={`/coop/funding/${p.id}`} variant="primary" size="sm" className="coopb-view-package" aria-label={`View package ${p.name}`}>View Package <ArrowRight size={16} /></LinkButton>
@@ -72,7 +65,6 @@ export default function PackagesTable({ rows, verified, emptyTitle, emptyText, e
         emptyText={emptyText}
         emptyAction={emptyAction}
       />
-      {dialog}
     </>
   );
 }

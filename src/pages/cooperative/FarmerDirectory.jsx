@@ -1,31 +1,33 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Clock, Download, Eye, Pencil, Plus, ShieldCheck, Trash2, Upload, UserX, Users } from 'lucide-react';
+import { Clock, Download, Eye, Pencil, Plus, ShieldCheck, Trash2, UserX, Users } from 'lucide-react';
 import {
   Avatar, Button, Card, DataTable, EmptyState, FilterSelect, KebabMenu, KpiStrip, LinkButton, PageHeader, PageSkeleton, Pagination, SearchInput, StatusPill,
 } from '../../components/ui/index.js';
-import { useApp, useSimulatedLoad } from '../../context/AppContext.jsx';
+import { useApp } from '../../context/AppContext.jsx';
 import { formatDate, formatTime } from '../../utils/format.js';
-import { UnverifiedBanner } from '../../components/coopa/Bits.jsx';
-import { BulkUploadModal } from '../../components/coopa/BulkUploadModal.jsx';
 import { RemoveFarmerModal } from '../../components/coopa/RemoveFarmerModal.jsx';
-import { downloadCsv, maskNin, toCsv, useCoop } from '../../components/coopa/helpers.js';
+import { downloadCsv, maskNin, toCsv } from '../../components/coopa/helpers.js';
+import { API_BASE_URL, apiErrorMessage } from '../../utils/api.js';
 import '../../styles/pages/coopa.css';
 
 const PAGE_SIZE = 10;
 
 export default function FarmerDirectory() {
-  const { toast } = useApp();
-  const { coop, farmers, verified } = useCoop();
-  const loading = useSimulatedLoad(350);
+  const { toast, accessToken, data, add } = useApp();
+  const [farmers, setFarmers] = useState([]);
+  const [metrics, setMetrics] = useState({ total_farmers: 0, verified_farmers: 0, pending_verification: 0, removed_farmers: 0 });
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [requestError, setRequestError] = useState('');
   const [sp, setSp] = useSearchParams();
-  const [bulkOpen, setBulkOpen] = useState(false);
   const [removing, setRemoving] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const q = sp.get('q') || '';
   const crop = sp.get('crop') || '';
   const status = sp.get('status') || '';
-  const sort = sp.get('sort') || '';
   const page = Math.max(1, Number(sp.get('page')) || 1);
 
   const setParam = (key, value) => setSp((prev) => {
@@ -35,56 +37,66 @@ export default function FarmerDirectory() {
     return next;
   }, { replace: true });
 
-  const counts = useMemo(() => {
-    const verifiedN = farmers.filter((f) => f.status === 'Verified').length;
-    const pendingN = farmers.filter((f) => f.status === 'Pending').length;
-    const removedN = farmers.filter((f) => f.status === 'Removed').length;
-    return { total: farmers.length - removedN, verified: verifiedN, pending: pendingN, removed: removedN };
-  }, [farmers]);
+  useEffect(() => {
+    const controller = new AbortController();
+    const load = async () => {
+      setLoading(true); setRequestError('');
+      if (!accessToken) { setRequestError('Your session has expired. Sign in again to view farmers.'); setLoading(false); return; }
+      const params = new URLSearchParams({ page: String(page), page_size: String(PAGE_SIZE) });
+      if (q.trim()) params.set('search', q.trim());
+      if (crop) params.set('crop_type', crop);
+      if (status) params.set('status', status);
+      try {
+        const response = await fetch(`${API_BASE_URL}/farmers/directory?${params}`, { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' }, signal: controller.signal });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(apiErrorMessage(payload, `Could not load farmers (${response.status}).`));
+        const items = Array.isArray(payload?.items) ? payload.items : [];
+        const mapped = items.map((f) => ({ ...f, name: f.full_name || [f.first_name, f.last_name].filter(Boolean).join(' ') || f.name || 'Unnamed farmer', firstName: f.first_name, lastName: f.last_name, dob: f.date_of_birth, experienceYears: f.years_of_experience, consent: f.terms_accepted ?? f.consent, gender: f.gender === 'FEMALE' ? 'Female' : f.gender === 'MALE' ? 'Male' : f.gender || '', bankName: f.bank_name || '', accountNumber: f.account_number || '', cropType: f.farming_category || f.crop_type || f.cropType || '-', farmingCategory: f.farming_category || f.crop_type || '', phone: f.phone_number || f.phone || '-', status: normaliseStatus(f.verification_status || f.status), dateAdded: f.date_added || f.created_at || f.dateAdded || '', farmIds: f.farms?.map((farm) => farm.id) || f.farmIds || [], farmCount: Array.isArray(f.farms) ? f.farms.length : Number.isFinite(Number(f.farm_count ?? f.farmCount)) ? Number(f.farm_count ?? f.farmCount) : null, nin: f.nin || '', id: f.id, coopId: f.cooperative_id || f.coopId }));
+        const farmersWithCounts = await Promise.all(mapped.map(async (farmer) => {
+          if (farmer.farmCount != null || !farmer.id) return farmer;
+          try {
+            const farmsResponse = await fetch(`${API_BASE_URL}/farmers/${encodeURIComponent(farmer.id)}/farms`, { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' }, signal: controller.signal });
+            if (!farmsResponse.ok) return { ...farmer, farmCount: 0 };
+            const farmList = await farmsResponse.json().catch(() => []);
+            const farmIds = Array.isArray(farmList) ? farmList.map((farm) => farm.id).filter(Boolean) : [];
+            return { ...farmer, farmCount: Array.isArray(farmList) ? farmList.length : 0, farmIds };
+          } catch (error) { if (error.name === 'AbortError') throw error; return { ...farmer, farmCount: 0 }; }
+        }));
+        if (controller.signal.aborted) return;
+        const mappedWithCounts = farmersWithCounts;
+        mappedWithCounts.forEach((f) => { if (f.id && !data.farmers.some((existing) => existing.id === f.id)) add('farmers', f); });
+        setFarmers(mappedWithCounts);
+        setMetrics(payload?.metrics || { total_farmers: 0, verified_farmers: 0, pending_verification: 0, removed_farmers: 0 });
+        setTotal(Number(payload?.total) || 0); setTotalPages(Math.max(1, Number(payload?.total_pages) || 1));
+      } catch (error) {
+        if (error.name !== 'AbortError') { setFarmers([]); setTotal(0); setTotalPages(1); setRequestError(error.message || 'Could not load farmers.'); }
+      } finally { if (!controller.signal.aborted) setLoading(false); }
+    };
+    load();
+    return () => controller.abort();
+  }, [accessToken, q, crop, status, page, reloadKey, data.farmers, add]);
 
-  const crops = useMemo(() => [...new Set(farmers.map((f) => f.cropType).filter(Boolean))].sort(), [farmers]);
-
-  const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    const digitsOnly = /^[\d\s+()-]+$/.test(needle);
-    const digits = needle.replace(/\D/g, '');
-    const out = farmers.filter((f) => {
-      if (crop && f.cropType !== crop) return false;
-      if (status && f.status !== status) return false;
-      if (!needle) return true;
-      if (digitsOnly && digits) return f.nin.includes(digits) || String(f.phone).replace(/\D/g, '').includes(digits);
-      return f.name.toLowerCase().includes(needle) || String(f.cropType || '').toLowerCase().includes(needle);
-    });
-    const by = {
-      oldest: (a, b) => new Date(a.dateAdded) - new Date(b.dateAdded),
-      name: (a, b) => a.name.localeCompare(b.name),
-    }[sort] || ((a, b) => new Date(b.dateAdded) - new Date(a.dateAdded));
-    return [...out].sort(by);
-  }, [farmers, q, crop, status, sort]);
-
-  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const current = Math.min(page, pages);
-  const rows = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
-  const from = filtered.length ? (current - 1) * PAGE_SIZE + 1 : 0;
-  const to = Math.min(current * PAGE_SIZE, filtered.length);
-  const filtersOn = Boolean(q || crop || status || sort);
+  const counts = { total: metrics.total_farmers || 0, verified: metrics.verified_farmers || 0, pending: metrics.pending_verification || 0, removed: metrics.removed_farmers || 0 };
+  const crops = ['crop_farming', 'fishery', 'mixed_farming', 'poultry', 'livestock', 'others'];
+  const rows = farmers;
+  const current = Math.min(page, totalPages);
+  const from = total ? (current - 1) * PAGE_SIZE + 1 : 0;
+  const to = Math.min(current * PAGE_SIZE, total);
+  const filtersOn = Boolean(q || crop || status);
 
   const exportCsv = () => {
     const header = ['Name', 'Crop type', 'Number of farms', 'Phone', 'NIN (last 4 digits)', 'Status', 'Date added'];
-    const body = filtered.map((f) => [f.name, f.cropType, Array.isArray(f.farmIds) ? f.farmIds.length : f.farmId ? 1 : 0, f.phone, maskNin(f.nin).slice(-4), f.status, String(f.dateAdded).slice(0, 10)]);
+    const body = farmers.map((f) => [f.name, f.cropType, f.farmCount ?? (Array.isArray(f.farmIds) ? f.farmIds.length : f.farmId ? 1 : 0), f.phone, maskNin(f.nin).slice(-4), f.status, String(f.dateAdded).slice(0, 10)]);
     downloadCsv('farmers.csv', toCsv([header, ...body]));
-    toast(`Exported ${filtered.length} ${filtered.length === 1 ? 'farmer' : 'farmers'} to farmers.csv.`, 'success');
+    toast(`Exported ${farmers.length} farmers on this page to farmers.csv.`, 'success');
   };
 
   if (loading) return <PageSkeleton />;
-  if (!coop) {
-    return <div className="page"><EmptyState title="We could not find your cooperative record" action={<LinkButton to="/coop" variant="outline">Back to dashboard</LinkButton>}>Sign in again with a cooperative account.</EmptyState></div>;
-  }
 
   const columns = [
     { key: 'name', header: 'Farmer', render: (f) => <div className="cell-person"><Avatar name={f.name} /><Link to={`/coop/farmers/${f.id}`} className="coopa-name">{f.name}</Link></div> },
     { key: 'cropType', header: 'Crop type' },
-    { key: 'farmCount', header: 'Number of farms', render: (f) => <span className="nowrap">{Array.isArray(f.farmIds) ? f.farmIds.length : f.farmId ? 1 : 0}</span> },
+    { key: 'farmCount', header: 'Number of farms', render: (f) => <span className="nowrap">{f.farmCount ?? (Array.isArray(f.farmIds) ? f.farmIds.length : f.farmId ? 1 : 0)}</span> },
     { key: 'phone', header: 'Phone number', render: (f) => <span className="nowrap">{f.phone}</span> },
     { key: 'status', header: 'Status', render: (f) => <StatusPill>{f.status}</StatusPill> },
     { key: 'dateAdded', header: 'Date added', render: (f) => <div className="nowrap">{formatDate(f.dateAdded)}<div className="cell-sub">{formatTime(f.dateAdded)}</div></div> },
@@ -116,14 +128,11 @@ export default function FarmerDirectory() {
         subtitle="Manage all farmers in your cooperative."
         actions={(
           <>
-            <Button variant="outline" onClick={exportCsv} disabled={filtered.length === 0}><Download size={18} />Export</Button>
-            <Button variant="outline" onClick={() => setBulkOpen(true)}><Upload size={18} />Bulk upload</Button>
+            <Button variant="outline" onClick={exportCsv} disabled={farmers.length === 0}><Download size={18} />Export</Button>
             <LinkButton to="/coop/farmers/new"><Plus size={18} />Add Farmer</LinkButton>
           </>
         )}
       />
-
-      <UnverifiedBanner coop={coop}>Farmers you add are saved as Pending. Bulk import, funding requests and disbursement requests unlock once your cooperative is verified.</UnverifiedBanner>
 
       <KpiStrip
         cells={[
@@ -134,7 +143,7 @@ export default function FarmerDirectory() {
         ]}
       />
 
-      {farmers.length === 0 ? (
+      {requestError ? <Card><EmptyState title="Could not load farmers" action={<Button variant="outline" onClick={() => setReloadKey((n) => n + 1)}>Retry</Button>}>{requestError}</EmptyState></Card> : total === 0 ? (
         <Card>
           <EmptyState
             icon={<Users size={28} />}
@@ -142,7 +151,6 @@ export default function FarmerDirectory() {
             action={(
               <div className="row-wrap" style={{ justifyContent: 'center' }}>
                 <LinkButton to="/coop/farmers/new"><Plus size={18} />Add your first farmer</LinkButton>
-                <Button variant="outline" onClick={() => setBulkOpen(true)}><Upload size={18} />Bulk upload</Button>
               </div>
             )}
           >
@@ -156,11 +164,10 @@ export default function FarmerDirectory() {
               <SearchInput value={q} onChange={(v) => setParam('q', v)} placeholder="Search by name, NIN, phone or crop type..." />
               <div className="table-toolbar__filters">
                 <FilterSelect value={crop} onChange={(v) => setParam('crop', v)} allLabel="All Crop Types" options={crops} />
-                <FilterSelect value={status} onChange={(v) => setParam('status', v)} allLabel="All Status" options={['Verified', 'Pending', 'Removed']} />
-                <FilterSelect value={sort} onChange={(v) => setParam('sort', v)} allLabel="Date Added (newest)" label="Sort farmers" options={[{ value: 'oldest', label: 'Date Added (oldest)' }, { value: 'name', label: 'Name (A to Z)' }]} />
+              <FilterSelect value={status} onChange={(v) => setParam('status', v)} allLabel="All Status" options={['Verified', 'Pending', 'Not_Verified']} />
               </div>
             </div>
-            {filtered.length === 0 ? (
+            {total === 0 ? (
               <EmptyState
                 title="No farmers match your search"
                 action={<Button variant="outline" onClick={() => setSp({}, { replace: true })}>Clear search and filters</Button>}
@@ -171,17 +178,23 @@ export default function FarmerDirectory() {
               <DataTable bare hideFooter pageSize={100} rows={rows} columns={columns} />
             )}
           </div>
-          {filtered.length > 0 && (
+          {total > 0 && (
             <div className="pagination-bar">
-              <span className="muted">Showing {from} - {to} of {filtered.length} {filtered.length === 1 ? 'farmer' : 'farmers'}{filtersOn ? ' (filtered)' : ''}</span>
-              <Pagination page={current} pages={pages} onPage={(n) => setParam('page', n > 1 ? String(n) : '')} />
+              <span className="muted">Showing {from} - {to} of {total} farmers{filtersOn ? ' (filtered)' : ''}</span>
+              <Pagination page={current} pages={totalPages} onPage={(n) => setParam('page', n > 1 ? String(n) : '')} />
             </div>
           )}
         </>
       )}
 
-      <BulkUploadModal open={bulkOpen} onClose={() => setBulkOpen(false)} coop={coop} farmers={farmers} verified={verified} />
-      <RemoveFarmerModal open={Boolean(removing)} farmer={removing} onClose={() => setRemoving(null)} />
+      <RemoveFarmerModal open={Boolean(removing)} farmer={removing} onClose={() => setRemoving(null)} onRemoved={() => setReloadKey((n) => n + 1)} />
     </div>
   );
+}
+
+function normaliseStatus(value) {
+  const status = String(value || '').toLowerCase();
+  if (status === 'verified' || status === 'approved') return 'Verified';
+  if (status === 'removed' || status === 'inactive') return 'Removed';
+  return 'Pending';
 }

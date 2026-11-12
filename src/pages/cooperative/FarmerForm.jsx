@@ -2,17 +2,21 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ClipboardCheck, FileDown, IdCard, Save, ShieldCheck, Sprout, UserRound } from 'lucide-react';
 import {
-  Banner, Breadcrumb, Button, Card, Checkbox, ConfirmDialog, EmptyState, Field, FileDrop, LinkButton, PageHeader, PageSkeleton, SectionHead, SelectField, TextField,
+  Banner, Breadcrumb, Button, Card, Checkbox, ConfirmDialog, EmptyState, FileDrop, LinkButton, PageHeader, PageSkeleton, SectionHead, SelectField, TextField,
 } from '../../components/ui/index.js';
-import { useApp, simulate, useSimulatedLoad } from '../../context/AppContext.jsx';
+import { useApp, useSimulatedLoad } from '../../context/AppContext.jsx';
+import { API_BASE_URL, apiErrorMessage } from '../../utils/api.js';
 import { UnverifiedBanner } from '../../components/coopa/Bits.jsx';
-import { CATEGORIES as FARMING_CATEGORIES } from '../../data/funding.js';
 import {
-  GENDER_OPTIONS, checkUpload, isEmail, isValidNin, maskNin, nextFarmerId, normalisePhone, splitName, useCoop,
+  GENDER_OPTIONS, checkUpload, isEmail, isValidNin, normalisePhone, splitName, useCoop,
 } from '../../components/coopa/helpers.js';
 import '../../styles/pages/coopa.css';
 
 const DRAFT_KEY = 'collabfarm-coopa-farmer-draft-v1';
+const FARMING_CATEGORIES = ['Crop Farming', 'Fishery', 'Mixed Farming', 'Poultry', 'Livestock', 'Others'];
+const FARMING_CATEGORY_API = { 'Crop Farming': 'crop_farming', Fishery: 'fishery', 'Mixed Farming': 'mixed_farming', Poultry: 'poultry', Livestock: 'livestock', Others: 'others' };
+const API_CATEGORY_LABEL = Object.fromEntries(Object.entries(FARMING_CATEGORY_API).map(([label, value]) => [value, label]));
+const FARMER_GENDER_OPTIONS = ['Female', 'Male'];
 const BLANK = {
   firstName: '', lastName: '', gender: '', phone: '', email: '', dob: '', nin: '', bankName: '', accountNumber: '', farmingCategory: '', experienceYears: '',
   consent: false,
@@ -21,6 +25,13 @@ const BLANK = {
 const readDraft = () => { try { return JSON.parse(window.localStorage.getItem(DRAFT_KEY)); } catch { return null; } };
 const writeDraft = (v) => { try { window.localStorage.setItem(DRAFT_KEY, JSON.stringify(v)); return true; } catch { return false; } };
 const clearDraft = () => { try { window.localStorage.removeItem(DRAFT_KEY); } catch { /* storage unavailable */ } };
+
+function normaliseStatus(value) {
+  const status = String(value || '').toLowerCase();
+  if (status === 'verified' || status === 'approved') return 'Verified';
+  if (status === 'rejected') return 'Rejected';
+  return 'Pending';
+}
 
 function fromFarmer(f) {
   const parts = f.firstName ? { first: f.firstName, last: f.lastName || '' } : splitName(f.name);
@@ -36,10 +47,14 @@ export default function FarmerForm() {
   const { id } = useParams();
   const edit = Boolean(id);
   const navigate = useNavigate();
-  const { data, add, update, notify, toast } = useApp();
-  const { coop, farmers, verified } = useCoop();
+  const { data, add, update, toast, accessToken } = useApp();
+  const { coop, farmers } = useCoop();
   const loading = useSimulatedLoad(300);
-  const farmer = edit ? farmers.find((f) => f.id === id) : null;
+  const cachedFarmer = edit ? farmers.find((f) => f.id === id) : null;
+  const [remoteFarmer, setRemoteFarmer] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(edit);
+  const [profileError, setProfileError] = useState('');
+  const farmer = edit ? (remoteFarmer || (!profileLoading && cachedFarmer)) : null;
 
   const [v, setV] = useState(BLANK);
   const [initial, setInitial] = useState(BLANK);
@@ -48,8 +63,36 @@ export default function FarmerForm() {
   const [files, setFiles] = useState([]);
   const [fileError, setFileError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [requestError, setRequestError] = useState('');
   const [leave, setLeave] = useState(false);
   const [draft, setDraft] = useState(null);
+
+  useEffect(() => {
+    if (!edit) return undefined;
+    const controller = new AbortController();
+    const load = async () => {
+      if (!accessToken) { setProfileError('Your session has expired. Sign in again to edit this farmer.'); setProfileLoading(false); return; }
+      setProfileLoading(true); setProfileError('');
+      try {
+        const response = await fetch(`${API_BASE_URL}/farmers/${encodeURIComponent(id)}`, { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' }, signal: controller.signal });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(apiErrorMessage(payload, `Could not load farmer (${response.status}).`));
+        const category = API_CATEGORY_LABEL[payload?.farming_category] || '';
+        setRemoteFarmer({
+          ...payload, id: payload?.id || id, name: payload?.full_name || [payload?.first_name, payload?.last_name].filter(Boolean).join(' '),
+          firstName: payload?.first_name || '', lastName: payload?.last_name || '', gender: payload?.gender === 'FEMALE' ? 'Female' : payload?.gender === 'MALE' ? 'Male' : '',
+          phone: payload?.phone_number || '', email: payload?.email || '', dob: payload?.date_of_birth || '', nin: payload?.nin || '',
+          bankName: payload?.bank_name || '', accountNumber: payload?.account_number || '', farmingCategory: category, cropType: category,
+          experienceYears: payload?.years_of_experience ?? '', consent: Boolean(payload?.terms_accepted), idFile: payload?.id_photo || '',
+          status: normaliseStatus(payload?.verification_status), identityStatus: String(payload?.verification_status || '').toLowerCase() === 'approved' ? 'Verified' : 'Pending',
+          coopId: payload?.cooperative_id || coop?.id,
+        });
+      } catch (error) { if (error.name !== 'AbortError') setProfileError(error.message || 'Could not load farmer details.'); }
+      finally { if (!controller.signal.aborted) setProfileLoading(false); }
+    };
+    load();
+    return () => controller.abort();
+  }, [edit, id, accessToken, coop]);
 
   // Prefill once the record is known (edit) or look for an unsent draft (add).
   useEffect(() => {
@@ -68,6 +111,7 @@ export default function FarmerForm() {
   const set = (key) => (e) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
     setV((s) => ({ ...s, [key]: value }));
+    setRequestError('');
     if (errors[key]) setErrors((s) => ({ ...s, [key]: '' }));
   };
 
@@ -108,7 +152,9 @@ export default function FarmerForm() {
     if (!normalisePhone(v.phone).ok) e.phone = v.phone.trim() ? 'Enter an 11-digit phone number, for example 0803 123 4567.' : 'Enter a phone number.';
     if (!v.bankName.trim()) e.bankName = 'Enter the farmer’s bank name.';
     if (!/^\d{10}$/.test(v.accountNumber)) e.accountNumber = 'Enter the farmer’s 10-digit account number.';
-    if (v.email.trim() && !isEmail(v.email)) e.email = 'Enter a valid email address or leave it blank.';
+    if (!edit && !v.email.trim()) e.email = 'Enter the farmer’s email address.';
+    else if (v.email.trim() && !isEmail(v.email)) e.email = 'Enter a valid email address.';
+    if (!edit && !v.dob) e.dob = 'Enter the farmer’s date of birth.';
     if (v.dob) {
       const d = new Date(v.dob);
       const age = (Date.now() - d.getTime()) / (365.25 * 86400000);
@@ -116,11 +162,13 @@ export default function FarmerForm() {
       else if (age < 18) e.dob = 'The farmer must be at least 18 years old to sign agreements.';
       else if (age > 100) e.dob = 'Check this date of birth.';
     }
+    if (!edit && !v.gender) e.gender = 'Select the farmer’s gender.';
     const nin = ninProblem(v.nin);
     if (nin) e.nin = nin;
-    if (files.length === 0) e.idFile = 'Upload an ID document or photo.';
+    if (!edit && files.length === 0) e.idFile = 'Upload an ID document or photo.';
     if (!v.farmingCategory) e.farmingCategory = 'Choose a farming category.';
-    if (v.experienceYears !== '' && !(Number.isInteger(Number(v.experienceYears)) && Number(v.experienceYears) >= 0 && Number(v.experienceYears) <= 80)) e.experienceYears = 'Enter whole years from 0 to 80.';
+    if (!edit && v.experienceYears === '') e.experienceYears = 'Enter the farmer’s years of experience.';
+    else if (!(Number.isInteger(Number(v.experienceYears)) && Number(v.experienceYears) >= 0 && Number(v.experienceYears) <= 80)) e.experienceYears = 'Enter whole years from 0 to 80.';
     if (!v.consent) e.consent = 'Consent is required before a farmer can be saved.';
     setErrors(e);
     return e;
@@ -161,7 +209,6 @@ export default function FarmerForm() {
       skills: edit ? farmer?.skills || [] : [], farmId: edit ? farmer?.farmId || null : null, membership: edit ? farmer?.membership || 'Active member' : 'Active member', consent: true, notes: edit ? farmer?.notes || '' : '', idFile: files[0]?.name || null,
     };
     setBusy(true);
-    await simulate(700);
     if (edit) {
       const parts = changeSummary(body, farmer);
       if (!parts.length) {
@@ -170,24 +217,111 @@ export default function FarmerForm() {
         navigate(`/coop/farmers/${farmer.id}`);
         return;
       }
-      const ninChanged = body.nin !== farmer.nin;
-      update('farmers', farmer.id, { ...body, duplicateFlag: softFlag?.text || (ninChanged ? null : farmer.duplicateFlag || null) }, {
-        action: 'Farmer details updated', entityType: 'Farmer', summary: parts.join('. '), reason: 'Edited by cooperative',
-      });
-      toast(`${name} was updated.`, 'success');
-      setBusy(false);
-      navigate(`/coop/farmers/${farmer.id}`);
+      try {
+        if (!accessToken) throw new Error('Your session has expired. Sign in again before editing a farmer.');
+        const multipart = new FormData();
+        const fields = {
+          first_name: first, last_name: last, date_of_birth: v.dob, email: v.email.trim(), nin: v.nin, phone_number: phone,
+          account_number: v.accountNumber, bank_name: v.bankName.trim(), gender: v.gender.toUpperCase(),
+          farming_category: FARMING_CATEGORY_API[v.farmingCategory], additional_info: farmer?.notes || '',
+          years_of_experience: String(Number(v.experienceYears)),
+        };
+        Object.entries(fields).forEach(([key, value]) => { if (value != null && value !== '') multipart.append(key, value); });
+        if (files[0]?.file) multipart.append('id_photo', files[0].file);
+        const response = await fetch(`${API_BASE_URL}/farmers/${encodeURIComponent(farmer.id)}`, {
+          method: 'PATCH', headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' }, body: multipart,
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(apiErrorMessage(payload, `Could not update farmer (${response.status}).`));
+        const updated = payload?.farmer || payload?.data || payload || {};
+        const ninChanged = body.nin !== farmer.nin;
+        update('farmers', farmer.id, {
+          ...body, name: updated.full_name || name, phone: updated.phone_number || phone,
+          farmingCategory: API_CATEGORY_LABEL[updated.farming_category] || v.farmingCategory,
+          status: normaliseStatus(updated.verification_status || farmer.status),
+          duplicateFlag: softFlag?.text || (ninChanged ? null : farmer.duplicateFlag || null),
+        }, { action: 'Farmer details updated', entityType: 'Farmer', summary: parts.join('. '), reason: 'Edited by cooperative' });
+        toast(`${name} was updated.`, 'success');
+        navigate(`/coop/farmers/${farmer.id}`);
+      } catch (error) { setRequestError(error.message || 'Could not update farmer.'); }
+      finally { setBusy(false); }
       return;
     }
-    const record = add('farmers', {
-      id: nextFarmerId(data.farmers), coopId: coop.id, ...body, status: 'Pending', identityStatus: 'Pending', agreementStatus: 'Not Signed',
-      dateAdded: new Date().toISOString(), allocationPackageId: null, allocatedAmount: 0, duplicateFlag: softFlag?.text || null,
-    }, { action: 'Farmer added', entityType: 'Farmer', summary: `${name} added as Pending. Farming category: ${v.farmingCategory}. NIN ${maskNin(v.nin)}.`, reason: 'Added by cooperative' });
-    notify('admin', softFlag ? 'Farmer added with a possible duplicate flag' : 'New farmer awaiting identity check', `${name} was added by ${coop.name}.${softFlag ? ` ${softFlag.text}.` : ''}`, '/admin/farmers-farms', 'verification');
-    clearDraft();
-    toast(`${name} was added as Pending. A reviewer will check their identity.`, 'success');
-    setBusy(false);
-    navigate(`/coop/farmers/${record.id}`);
+    setRequestError('');
+    try {
+      if (!accessToken) {
+        setRequestError('Your session has expired. Sign in again before adding a farmer.');
+        return;
+      }
+      const multipart = new FormData();
+      multipart.append('first_name', first);
+      multipart.append('last_name', last);
+      multipart.append('date_of_birth', v.dob);
+      multipart.append('email', v.email.trim());
+      multipart.append('nin', v.nin);
+      multipart.append('years_of_experience', String(Number(v.experienceYears)));
+      multipart.append('terms_accepted', String(v.consent));
+      multipart.append('id_photo', files[0].file);
+      multipart.append('phone_number', phone);
+      multipart.append('account_number', v.accountNumber);
+      multipart.append('bank_name', v.bankName.trim());
+      multipart.append('gender', v.gender.toUpperCase());
+      multipart.append('farming_category', FARMING_CATEGORY_API[v.farmingCategory]);
+
+      const response = await fetch(`${API_BASE_URL}/farmers`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+        body: multipart,
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        setRequestError(apiErrorMessage(payload, `Could not add farmer (${response.status}). Please try again.`));
+        return;
+      }
+      const created = payload?.farmer || payload?.data || payload;
+      if (!created?.id) {
+        clearDraft();
+        toast(`${name} was added successfully.`, 'success');
+        navigate('/coop/farmers');
+        return;
+      }
+      const category = API_CATEGORY_LABEL[created.farming_category] || v.farmingCategory;
+      const verificationStatus = String(created.verification_status || 'PENDING').toLowerCase();
+      const record = add('farmers', {
+        id: created.id,
+        coopId: created.cooperative_id || coop.id,
+        name: created.full_name || `${created.first_name || first} ${created.last_name || last}`,
+        firstName: created.first_name || first,
+        lastName: created.last_name || last,
+        dob: created.date_of_birth || v.dob,
+        email: created.email || v.email.trim(),
+        nin: created.nin || v.nin,
+        phone: created.phone_number || phone,
+        accountNumber: created.account_number || v.accountNumber,
+        accountName: created.account_name || '',
+        bankName: created.bank_name || v.bankName.trim(),
+        gender: created.gender === 'FEMALE' ? 'Female' : created.gender === 'MALE' ? 'Male' : v.gender,
+        farmingCategory: category,
+        cropType: category,
+        experienceYears: created.years_of_experience ?? Number(v.experienceYears),
+        consent: created.terms_accepted ?? v.consent,
+        idFile: created.id_photo || files[0].name,
+        status: verificationStatus === 'approved' ? 'Verified' : verificationStatus === 'rejected' ? 'Rejected' : 'Pending',
+        identityStatus: verificationStatus === 'approved' ? 'Verified' : 'Pending',
+        agreementStatus: 'Not Signed',
+        dateAdded: created.date_added || created.created_at || new Date().toISOString(),
+        allocationPackageId: null,
+        allocatedAmount: 0,
+        duplicateFlag: softFlag?.text || null,
+      }, { action: 'Farmer added', entityType: 'Farmer', summary: `${name} added. Farming category: ${category}.`, reason: 'Added by cooperative' });
+      clearDraft();
+      toast(`${record.name} was added.`, 'success');
+      navigate(`/coop/farmers/${record.id}`);
+    } catch {
+      setRequestError('Could not connect to the farmer service. Check your connection and try again.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const saveDraft = () => {
@@ -207,10 +341,10 @@ export default function FarmerForm() {
 
   const cancel = () => (dirty ? setLeave(true) : navigate(edit ? `/coop/farmers/${id}` : '/coop/farmers'));
 
-  if (loading || (!ready && (edit ? Boolean(farmer) : Boolean(coop)))) return <PageSkeleton />;
+  if (loading || profileLoading || (!ready && (edit ? Boolean(farmer) : Boolean(coop)))) return <PageSkeleton />;
   if (!coop) return <div className="page"><EmptyState title="We could not find your cooperative record" action={<LinkButton to="/coop" variant="outline">Back to dashboard</LinkButton>}>Sign in again with a cooperative account.</EmptyState></div>;
   if (edit && !farmer) {
-    return <div className="page"><EmptyState title="Farmer not found" action={<LinkButton to="/coop/farmers" variant="outline">Back to Farmer Directory</LinkButton>}>This farmer does not exist in your cooperative, or the link is out of date.</EmptyState></div>;
+    return <div className="page"><EmptyState title={profileError ? 'Could not load farmer' : 'Farmer not found'} action={<LinkButton to="/coop/farmers" variant="outline">Back to Farmer Directory</LinkButton>}>{profileError || 'This farmer does not exist in your cooperative, or the link is out of date.'}</EmptyState></div>;
   }
   if (edit && farmer.status === 'Removed') {
     return <div className="page"><EmptyState title="Removed farmers cannot be edited" action={<LinkButton to={`/coop/farmers/${farmer.id}`} variant="outline">View record</LinkButton>}>{farmer.name} was removed from your list. Their record is kept for history and cannot be changed.</EmptyState></div>;
@@ -245,6 +379,7 @@ export default function FarmerForm() {
           <button type="button" className="link-btn" onClick={() => { clearDraft(); setDraft(null); toast('Draft discarded.', 'info'); }}>discard it</button>.
         </Banner>
       )}
+      {requestError && <Banner tone="danger" title="Unable to add farmer">{requestError}</Banner>}
       {errorCount > 0 && <Banner tone="danger" title={`Please fix ${errorCount} ${errorCount === 1 ? 'field' : 'fields'} before saving`}>Each field with a problem is marked in red below.</Banner>}
 
       <Card>
@@ -252,10 +387,10 @@ export default function FarmerForm() {
         <div className="form-grid">
           <TextField label="First name" required placeholder="Enter first name" autoComplete="off" value={v.firstName} onChange={set('firstName')} error={errors.firstName} />
           <TextField label="Last name" required placeholder="Enter last name" autoComplete="off" value={v.lastName} onChange={set('lastName')} error={errors.lastName} />
-          <SelectField label="Gender" optional placeholder="Select gender" options={GENDER_OPTIONS} value={v.gender} onChange={set('gender')} />
+          <SelectField label="Gender" required={!edit} placeholder="Select gender" options={edit ? GENDER_OPTIONS : FARMER_GENDER_OPTIONS} value={v.gender} onChange={set('gender')} error={errors.gender} />
           <TextField label="Phone number" required type="tel" inputMode="tel" placeholder="Enter phone number" value={v.phone} onChange={set('phone')} error={errors.phone} hint={softFlag?.hint || 'For example 0803 123 4567'} />
-          <TextField label="Email address" optional type="email" placeholder="name@example.com" value={v.email} onChange={set('email')} error={errors.email} />
-          <TextField label="Date of birth" optional type="date" max={new Date().toISOString().slice(0, 10)} value={v.dob} onChange={set('dob')} error={errors.dob} />
+          <TextField label="Email address" required={!edit} type="email" placeholder="name@example.com" value={v.email} onChange={set('email')} error={errors.email} />
+          <TextField label="Date of birth" required={!edit} type="date" max={new Date().toISOString().slice(0, 10)} value={v.dob} onChange={set('dob')} error={errors.dob} />
         </div>
       </Card>
 
@@ -279,7 +414,7 @@ export default function FarmerForm() {
             />
             {ninLocked && <p className="caption muted coopa-inline"><ShieldCheck size={14} />A CollabFarm reviewer verified this identity.</p>}
           </div>
-          <FileDrop label="ID or photo" required files={files} onFiles={(list) => { pickFile(list); if (list?.length) setErrors((s) => ({ ...s, idFile: '' })); }} error={fileError || errors.idFile} accept="JPG, PNG or PDF (Max 5MB)" prompt="Click to upload or drag and drop" />
+          <FileDrop label="ID photo" required includeFile={!edit} files={files} onFiles={(list) => { pickFile(list); if (list?.length) setErrors((s) => ({ ...s, idFile: '' })); }} error={fileError || errors.idFile} accept="JPG, PNG or PDF (Max 5MB)" prompt="Click to upload or drag and drop" />
         </div>
       </Card>
 
@@ -295,7 +430,7 @@ export default function FarmerForm() {
         <SectionHead icon={<Sprout size={18} />} title="Farming information" />
         <div className="form-grid">
           <SelectField label="Farming category" required placeholder="Select farming category" options={FARMING_CATEGORIES} value={v.farmingCategory} onChange={set('farmingCategory')} error={errors.farmingCategory} />
-          <TextField label="Years of farming experience" optional inputMode="numeric" placeholder="For example 5" value={v.experienceYears} onChange={set('experienceYears')} error={errors.experienceYears} />
+          <TextField label="Years of farming experience" required={!edit} inputMode="numeric" placeholder="For example 5" value={v.experienceYears} onChange={set('experienceYears')} error={errors.experienceYears} />
         </div>
       </Card>
 

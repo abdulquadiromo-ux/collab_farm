@@ -18,12 +18,12 @@ export function BasicsStep({ form, set, errors, farmers = [], packageId }) {
       <SectionHead icon="1" title="Package Basics" />
       <div className="form-grid">
         <TextField label="Package Name" required placeholder="For example, Maize Growth Package" maxLength={80} {...inputProps(form, set, 'name')} error={errors.name} />
-        <SelectField label="Package Type" required options={TIERS} {...inputProps(form, set, 'tier')} error={errors.tier} hint="Starter, Growth and Commercial follow the standard templates. Custom is your own design." />
+        <SelectField label="Package Type" required options={TIERS} {...inputProps(form, set, 'tier')} error={errors.tier} hint="Choose a package type supported by the platform." />
         <SelectField label="Category" required placeholder="Choose a category" options={ALL_CATEGORIES} {...inputProps(form, set, 'category')} error={errors.category} />
         <TextField label="Tenure (months)" required type="number" min={1} max={36} placeholder="4" {...inputProps(form, set, 'tenureMonths')} error={errors.tenureMonths} hint="How long the farming cycle lasts, from start to final settlement." />
         <TextAreaField className="full" label="Short Description" required placeholder="What will this package fund, and who benefits?" {...inputProps(form, set, 'description')} error={errors.description} />
         <div className="full">
-          <Field label="Farmers" hint="Choose farmers to include, then enter how much to invest in each one.">
+          <Field label="Farmers" error={errors.farmers} hint="Choose farmers to include, then enter how much to invest in each one.">
             {() => (
               <div className="stack-sm">
                 {(form.farmers.length ? form.farmers : [{ farmerId: '', allocatedAmount: '' }]).map((allocation, index) => {
@@ -108,10 +108,10 @@ export function DetailsStep({ form, set, errors, setBudget, clearError }) {
       <Card tone="green">
         <SectionHead icon="2" title="Funding Details" />
         <div className="form-grid">
-          <MoneyField label="Total Package Amount" required value={form.amount} onChange={(v) => set('amount', v)} error={errors.amount} hint="In Nigerian naira. The budget below must add up to this amount." />
+        <MoneyField label="Total Package Amount" required value={form.amount} onChange={(v) => set('amount', v)} error={errors.amount} hint="In Nigerian naira. The budget and farmer allocations must add up to this amount." />
           <TextField label="Expected Duration" readOnly value={duration} placeholder="Set in Package Basics" hint={months ? 'Taken from your tenure and dates in Package Basics.' : 'Taken from the tenure in Package Basics.'} />
           <TextField label="Expected ROI (estimate, %)" required type="number" step="0.1" min={0} max={100} placeholder="18" {...inputProps(form, set, 'expectedRoiPct')} error={errors.expectedRoiPct} hint="An estimate inside your range from Package Basics. Not a promise." />
-          <TextField label="Cooperative Share (%)" required type="number" step="0.1" min={0} max={50} {...inputProps(form, set, 'coopSharePct')} error={errors.coopSharePct} hint="The part of the profit your cooperative keeps." />
+          <TextField label="Cooperative Share (%)" required type="number" step="0.1" min={0} max={100} {...inputProps(form, set, 'coopSharePct')} error={errors.coopSharePct} hint="The part of the profit your cooperative keeps." />
         </div>
         <div className="mt-4"><PlainTerms terms={['roi', 'coopShare']} /></div>
       </Card>

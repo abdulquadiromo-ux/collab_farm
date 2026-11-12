@@ -1,120 +1,174 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  ChevronRight, Landmark, PackageCheck, Printer, ShieldCheck, Users, Banknote, Circle,
-} from 'lucide-react';
+import { ChevronRight, Landmark, PackageCheck, Printer, ShieldCheck, Users, Banknote, Circle } from 'lucide-react';
 import {
   Avatar, Button, Card, CardHeader, DataTable, EmptyState, KpiCard, LinkButton, PageHeader, PageSkeleton, StatusPill,
 } from '../../components/ui/index.js';
 import { BarChart, DonutChart } from '../../components/charts/Charts.jsx';
-import { useApp, useSimulatedLoad } from '../../context/AppContext.jsx';
-import { ROI_SERIES } from '../../data/governance.js';
-import { formatDate, formatNaira, formatTime } from '../../utils/format.js';
-import { UnverifiedBanner } from '../../components/coopa/Bits.jsx';
-import { daysAgo, downloadCsv, timeOfDay, toCsv, useCoop } from '../../components/coopa/helpers.js';
+import { useApp } from '../../context/AppContext.jsx';
+import { formatDate, formatNaira, formatNumber, formatTime } from '../../utils/format.js';
+import { API_BASE_URL, apiErrorMessage } from '../../utils/api.js';
+import { downloadCsv, toCsv, timeOfDay } from '../../components/coopa/helpers.js';
 import '../../styles/pages/coopa.css';
 
 export default function Dashboard() {
-  const { data, user } = useApp();
-  const { coop, farmers, farms, packages } = useCoop();
-  const loading = useSimulatedLoad(350);
+  const { accessToken, user, signOut } = useApp();
+  const [overview, setOverview] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [range, setRange] = useState('6m');
+  const [reloadKey, setReloadKey] = useState(0);
+  const [directoryFarmers, setDirectoryFarmers] = useState(null);
 
-  const stats = useMemo(() => {
-    const active = farmers.filter((f) => f.status !== 'Removed');
-    const verifiedCount = active.filter((f) => f.status === 'Verified').length;
-    const pending = active.filter((f) => f.status === 'Pending');
-    const addedRecently = active.filter((f) => daysAgo(f.dateAdded) >= 0 && daysAgo(f.dateAdded) <= 30).length;
-    // "Received" means confirmed by the financial partner (package.raised). Commitments are not received money.
-    const received = packages.reduce((s, p) => s + (Number(p.raised) || 0), 0);
-    const committed = packages.reduce((s, p) => s + (Number(p.committed) || 0), 0);
-    const crops = {};
-    active.forEach((f) => {
-      const category = f.farmingCategory || f.cropType || 'Other';
-      crops[category] = (crops[category] || 0) + 1;
-    });
-    const sorted = Object.entries(crops).sort((a, b) => b[1] - a[1]);
-    const top = sorted.slice(0, 4);
-    const rest = sorted.slice(4).reduce((s, [, n]) => s + n, 0);
-    if (rest) top.push(['Others', rest]);
-    return { active, verifiedCount, pending, addedRecently, received, committed, awaiting: Math.max(0, committed - received), crops: top };
-  }, [farmers, packages]);
+  useEffect(() => {
+    if (!accessToken) {
+      setError('Your session has expired. Sign in again to load your dashboard.');
+      setLoading(false);
+      return undefined;
+    }
+    const controller = new AbortController();
+    setLoading(true);
+    setError('');
+    fetch(`${API_BASE_URL}/dashboard/overview`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(apiErrorMessage(payload, `Dashboard request failed (${response.status}).`));
+        setOverview(payload || {});
+      })
+      .catch((cause) => {
+        if (cause.name !== 'AbortError') setError(cause.message || 'Could not load your dashboard. Please try again.');
+      })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [accessToken, reloadKey]);
 
-  const pkgIds = useMemo(() => packages.map((p) => p.id), [packages]);
+  useEffect(() => {
+    if (!accessToken) { setDirectoryFarmers([]); return undefined; }
+    const controller = new AbortController();
+    const loadRecent = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/farmers/directory?page=1&page_size=5`, {
+          headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' }, signal: controller.signal,
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) throw new Error('Could not load recent farmers.');
+        setDirectoryFarmers((Array.isArray(payload?.items) ? payload.items : []).map((item, index) => ({
+          id: item?.id || item?.farmer_id || `directory-${index}`,
+          name: item?.full_name || [item?.first_name, item?.last_name].filter(Boolean).join(' ') || item?.name || 'Farmer',
+          cropType: item?.farming_category || item?.crop_type || item?.crop || '—',
+          dateAdded: item?.date_added || '',
+          status: item?.verification_status || item?.status || '—',
+          profileId: item?.id || item?.farmer_id,
+        })));
+      } catch (cause) { if (cause.name !== 'AbortError') setDirectoryFarmers(null); }
+    };
+    loadRecent();
+    return () => controller.abort();
+  }, [accessToken, reloadKey]);
 
-  const investmentCounts = useMemo(() => {
-    const mine = data.investments.filter((i) => pkgIds.includes(i.packageId));
-    const count = (s) => mine.filter((i) => i.status === s).length;
-    return { total: mine.length, rows: [['Active', count('Active'), '#17b26a'], ['Pending', count('Pending'), '#f79009'], ['Completed', count('Completed'), '#2970ff'], ['Repaid', count('Repaid'), '#2970ff'], ['Overdue', count('Overdue'), '#d92d20']] };
-  }, [data.investments, pkgIds]);
+  const kpis = overview?.kpis || {};
+  const totalFarmers = metricValue(kpis.total_farmers, 'count');
+  const verifiedFarmers = metricValue(kpis.verified_farmers, 'count');
+  const packagesCreated = metricValue(kpis.total_packages_created, 'count');
+  const fundingReceived = metricValue(kpis.total_funding_received, 'money');
 
-  const recentFarmers = useMemo(() => [...farmers].sort((a, b) => new Date(b.dateAdded) - new Date(a.dateAdded)).slice(0, 5), [farmers]);
+  const roiRows = useMemo(() => {
+    const source = Array.isArray(overview?.accumulative_roi) ? overview.accumulative_roi : [];
+    const rows = source.map((item, index) => {
+      const value = numericValue(item?.roi_percentage ?? item?.percentage ?? item?.roi ?? item?.value ?? item?.amount);
+      return {
+        label: String(item?.label || item?.month || item?.period || item?.date || `Period ${index + 1}`),
+        value: value === null ? null : Math.min(100, Math.max(0, value)),
+        tone: item?.tone === 'gold' ? 'gold' : 'green',
+      };
+    }).filter((item) => item.value !== null);
+    return rows.slice(range === '6m' ? -6 : -12);
+  }, [overview, range]);
+
+  const categoryRows = useMemo(() => {
+    const source = Array.isArray(overview?.farmers_by_farming_category) ? overview.farmers_by_farming_category : [];
+    const rows = source.map((item) => ({
+      label: String(item?.category || item?.farming_category || item?.farmingCategory || item?.name || 'Other'),
+      value: numericValue(item?.count ?? item?.total ?? item?.value ?? item?.farmers) ?? 0,
+    })).filter((item) => item.value > 0);
+    const total = rows.reduce((sum, item) => sum + item.value, 0);
+    return rows.map((item) => ({ ...item, display: `${formatNumber(item.value)} (${total ? Math.round((item.value / total) * 1000) / 10 : 0}%)` }));
+  }, [overview]);
+
+  const recentFarmers = useMemo(() => {
+    if (directoryFarmers !== null) return directoryFarmers;
+    const source = Array.isArray(overview?.recent_farmers) ? overview.recent_farmers : [];
+    return source.map((item, index) => ({
+      id: item?.id || item?.farmer_id || `recent-${index}`,
+      name: item?.name || item?.farmer_name || item?.full_name || 'Farmer',
+      cropType: item?.crop_type || item?.farming_category || item?.farmingCategory || item?.crop || '—',
+      dateAdded: item?.date_added || item?.created_at || item?.createdAt || item?.date || '',
+      status: item?.status || '—',
+      profileId: item?.id || item?.farmer_id,
+    }));
+  }, [overview, directoryFarmers]);
+
+  const investmentSummary = overview?.investment_summary || {};
+  const investmentRows = [
+    ['Active', countValue(investmentSummary.active), '#17b26a'],
+    ['Pending', countValue(investmentSummary.pending), '#f79009'],
+    ['Repaid', countValue(investmentSummary.repaid), '#2970ff'],
+    ['Overdue', countValue(investmentSummary.overdue), '#d92d20'],
+  ];
+  const investmentTotal = investmentRows.reduce((sum, [, count]) => sum + count, 0);
+  const first = overview?.greeting_name || user?.firstName || user?.name?.split(' ')[0] || 'there';
+
+  const exportReport = () => {
+    downloadCsv('cooperative-summary.csv', toCsv([
+      ['Cooperative', overview?.cooperative_name || ''], ['Report date', formatDate(new Date())], [],
+      ['Measure', 'Value'],
+      ['Total farmers', numericValue(kpis.total_farmers) ?? ''],
+      ['Verified farmers', numericValue(kpis.verified_farmers) ?? ''],
+      ['Total packages created', numericValue(kpis.total_packages_created) ?? ''],
+      ['Total farm area', metricRaw(kpis.total_farm_area) ?? ''],
+      ['Funding received (NGN)', numericValue(kpis.total_funding_received) ?? ''],
+    ]));
+  };
 
   if (loading) return <PageSkeleton />;
-  if (!coop) {
+  if (error) {
     return (
       <div className="page">
-        <EmptyState title="We could not find your cooperative record" action={<LinkButton to="/login" variant="outline">Back to sign in</LinkButton>}>
-          Sign in again with a cooperative account to see this dashboard.
+        <EmptyState
+          title="Dashboard unavailable"
+          action={<Button onClick={() => error.includes('session has expired') ? (signOut(), window.location.assign('/login')) : setReloadKey((key) => key + 1)}>Try again</Button>}
+        >
+          {error}
         </EmptyState>
       </div>
     );
   }
-
-  const first = user?.firstName || user?.name?.split(' ')[0] || 'there';
-  const activeCount = stats.active.length;
-
-  const exportReport = () => {
-    downloadCsv('cooperative-summary.csv', toCsv([
-      ['Cooperative', coop.name], ['Report date', formatDate(new Date())], [],
-      ['Measure', 'Value'],
-      ['Total farmers (not removed)', activeCount], ['Verified farmers', stats.verifiedCount], ['Pending farmers', stats.pending.length],
-      ['Total packages created', packages.length], ['Funding confirmed received (NGN)', stats.received], ['Committed, awaiting confirmation (NGN)', stats.awaiting],
-    ]));
-  };
-
-  const donut = stats.crops.map(([label, value]) => ({ label, value, display: `${value} (${Math.round((value / activeCount) * 1000) / 10}%)` }));
 
   return (
     <div className="page coopa">
       <PageHeader
         greeting
         title={<>Good {timeOfDay()}, <em>{first}</em></>}
-        subtitle="Monitor your farmers, farms and funding in one place."
+        subtitle={overview?.cooperative_name ? `Overview for ${overview.cooperative_name}.` : 'Monitor your farmers, farms and funding in one place.'}
         actions={<Button variant="outline" onClick={exportReport}><Printer size={18} />Export Report</Button>}
       />
 
-      <UnverifiedBanner coop={coop} />
-
       <div className="kpi-grid">
-        <KpiCard
-          icon={<Users size={18} />}
-          label="Total Farmers"
-          value={activeCount}
-          pill={stats.addedRecently > 0 ? `+${stats.addedRecently}` : undefined}
-          action={activeCount === 0 ? <Link className="kpi-card__link" to="/coop/farmers/new">Add your first farmer <ChevronRight size={14} /></Link> : undefined}
-        >
-          <div className="kpi-card__delta">{activeCount === 0 ? 'No farmers on your list yet.' : stats.addedRecently > 0 ? `${stats.addedRecently} added in the last 30 days` : 'None added in the last 30 days'}</div>
+        <KpiCard icon={<Users size={18} />} label="Total Farmers" value={totalFarmers}>
+          <div className="kpi-card__delta">Farmers registered with your cooperative</div>
         </KpiCard>
-        <KpiCard icon={<ShieldCheck size={18} />} label="Verified Farmers" value={stats.verifiedCount}>
-          <div className="kpi-card__delta">{activeCount === 0 ? 'Verified by CollabFarm reviewers.' : `${Math.round((stats.verifiedCount / activeCount) * 100)}% of your farmers. ${stats.pending.length} pending.`}</div>
+        <KpiCard icon={<ShieldCheck size={18} />} label="Verified Farmers" value={verifiedFarmers}>
+          <div className="kpi-card__delta">Verified by CollabFarm reviewers</div>
         </KpiCard>
-        <KpiCard
-          icon={<PackageCheck size={18} />}
-          label="Total Packages Created"
-          value={packages.length}
-          action={packages.length === 0 ? <Link className="kpi-card__link" to="/coop/funding">Create a package <ChevronRight size={14} /></Link> : undefined}
-        >
+        <KpiCard icon={<PackageCheck size={18} />} label="Total Packages Created" value={packagesCreated}>
           <div className="kpi-card__delta">Funding packages created by your cooperative</div>
         </KpiCard>
-        <KpiCard
-          icon={<Banknote size={18} />}
-          label="Total Funding Received"
-          value={formatNaira(stats.received)}
-          tone="gold"
-          action={packages.length === 0 ? <Link className="kpi-card__link" to="/coop/funding">See funding <ChevronRight size={14} /></Link> : undefined}
-        >
-          <div className="kpi-card__delta">{packages.length === 0 ? 'No funding requests yet.' : stats.awaiting > 0 ? `${formatNaira(stats.awaiting)} committed, awaiting confirmation` : 'Confirmed by the financial partner'}</div>
+        <KpiCard icon={<Banknote size={18} />} label="Total Funding Received" value={fundingReceived} tone="gold">
+          <div className="kpi-card__delta">Confirmed by the financial partner</div>
         </KpiCard>
       </div>
       <p className="caption muted coopa-note">Funding received is money confirmed by the financial partner. A commitment from an investor is a promise, not received money, so it is not counted here.</p>
@@ -123,24 +177,23 @@ export default function Dashboard() {
         <Card>
           <CardHeader
             title="Accumulative ROI"
-            subtitle="Track a sample return trend over time."
+            subtitle="Accumulated return on investment over time."
             action={(
-              <select className="select select--filter" value={range} onChange={(e) => setRange(e.target.value)} aria-label="ROI range">
-                <option value="6m">In 6 months</option>
-                <option value="12m">In 12 months</option>
+              <select className="select select--filter" value={range} onChange={(event) => setRange(event.target.value)} aria-label="ROI range">
+                <option value="6m">Last 6 periods</option>
+                <option value="12m">Last 12 periods</option>
               </select>
             )}
           />
-          <BarChart data={ROI_SERIES[range]} height={280} />
-          <p className="caption muted coopa-illustrative"><strong>Illustrative example only.</strong> These bars are sample figures, not your cooperative's results. Expected returns are estimates and are never guaranteed.</p>
+          {roiRows.length ? <BarChart data={roiRows} height={280} /> : <EmptyState title="No ROI data yet">ROI figures will appear here when available.</EmptyState>}
         </Card>
         <Card>
           <CardHeader title="Farmers by Farming Category" action={<LinkButton to="/coop/farmers" variant="outline" size="sm">View All Farmers</LinkButton>} />
-          {donut.length ? (
-            <DonutChart data={donut} total={activeCount} />
+          {categoryRows.length ? (
+            <DonutChart data={categoryRows} total={formatNumber(categoryRows.reduce((sum, item) => sum + item.value, 0))} />
           ) : (
-            <EmptyState icon={<Users size={28} />} title="No farmers yet" action={<LinkButton to="/coop/farmers/new" size="sm">Add Farmer</LinkButton>}>
-              Once you add farmers, you will see how your crops are split here.
+            <EmptyState icon={<Users size={28} />} title="No category data yet" action={<LinkButton to="/coop/farmers/new" size="sm">Add Farmer</LinkButton>}>
+              Farmer category totals will appear here when available.
             </EmptyState>
           )}
         </Card>
@@ -154,33 +207,32 @@ export default function Dashboard() {
             hideFooter
             pageSize={5}
             rows={recentFarmers}
-            emptyTitle="No farmers added yet"
-            emptyText="Farmers you add will appear here with their verification status."
-            emptyAction={<LinkButton to="/coop/farmers/new" size="sm">Add Farmer</LinkButton>}
+            emptyTitle="No recent farmers"
+            emptyText="Newly registered farmers will appear here."
             columns={[
-              { key: 'name', header: 'Names', render: (f) => <div className="cell-person"><Avatar name={f.name} /><Link to={`/coop/farmers/${f.id}`} className="coopa-name">{f.name}</Link></div> },
+              { key: 'name', header: 'Names', render: (farmer) => <div className="cell-person"><Avatar name={farmer.name} />{farmer.profileId ? <Link to={`/coop/farmers/${farmer.profileId}`} className="coopa-name">{farmer.name}</Link> : <span className="coopa-name">{farmer.name}</span>}</div> },
               { key: 'cropType', header: 'Crop type' },
-              { key: 'dateAdded', header: 'Date & time added', render: (f) => <div>{formatDate(f.dateAdded)}<div className="cell-sub">{formatTime(f.dateAdded)}</div></div> },
-              { key: 'status', header: 'Status', render: (f) => <StatusPill>{f.status}</StatusPill> },
+              { key: 'dateAdded', header: 'Date & time added', render: (farmer) => farmer.dateAdded ? <div>{formatDate(farmer.dateAdded)}<div className="cell-sub">{formatTime(farmer.dateAdded)}</div></div> : '—' },
+              { key: 'status', header: 'Status', render: (farmer) => <StatusPill>{farmer.status}</StatusPill> },
             ]}
           />
         </Card>
 
         <Card>
           <CardHeader title="Recent investments" subtitle="Investor commitments to your funding packages." />
-          {investmentCounts.total === 0 ? (
+          {investmentTotal === 0 ? (
             <EmptyState icon={<Landmark size={28} />} title="No investments yet" action={<LinkButton to="/coop/funding" variant="outline" size="sm">View funding</LinkButton>}>
-              Investors can commit once a funding request is approved and open for funding.
+              Investment totals will appear here when available.
             </EmptyState>
           ) : (
             <>
               <ul className="coopa-inv">
-                {investmentCounts.rows.map(([label, n, color]) => (
+                {investmentRows.map(([label, count, color]) => (
                   <li key={label}>
                     <Link to="/coop/investments" className="coopa-inv__row">
                       <Circle size={10} fill={color} stroke={color} />
                       <span className="grow">{label}</span>
-                      <strong>{n}</strong>
+                      <strong>{count}</strong>
                       <ChevronRight size={16} />
                     </Link>
                   </li>
@@ -195,3 +247,39 @@ export default function Dashboard() {
     </div>
   );
 }
+
+function metricRaw(metric) {
+  if (metric === null || metric === undefined) return undefined;
+  if (typeof metric !== 'object') return metric;
+  return metric.value ?? metric.count ?? metric.total ?? metric.amount ?? metric.number;
+}
+
+function numericValue(metric) {
+  const value = metricRaw(metric);
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function countValue(metric) {
+  return numericValue(metric) ?? 0;
+}
+
+function metricValue(metric, kind) {
+  if (metric === null || metric === undefined) return '—';
+  if (typeof metric === 'object') {
+    const formatted = metric.formatted_value || metric.formatted || metric.display;
+    if (formatted !== undefined && formatted !== null) return formatted;
+  }
+  const raw = metricRaw(metric);
+  if (raw === undefined || raw === null || raw === '') return '—';
+  if (kind === 'money') {
+    const number = Number(raw);
+    return Number.isFinite(number) ? formatNaira(number) : String(raw);
+  }
+  const number = Number(raw);
+  const display = Number.isFinite(number) ? formatNumber(number) : String(raw);
+  if (kind === 'area' && typeof metric === 'object') return `${display}${metric.unit ? ` ${metric.unit}` : ''}`;
+  return kind === 'area' && Number.isFinite(number) ? `${display} ha` : display;
+}
+

@@ -58,7 +58,8 @@ export default function Login() {
         const detail = typeof payload?.detail === 'string'
           ? payload.detail
           : Array.isArray(payload?.detail) ? payload.detail.map((item) => item.msg).join(' ') : '';
-        setRequestError(detail || (response.status === 401 ? 'Incorrect username or password.' : `Login failed (${response.status}). Please try again.`));
+        const credentialsRejected = [400, 401, 403].includes(response.status);
+        setRequestError(detail || (credentialsRejected ? 'Incorrect username or password. Check your details and try again.' : `Login failed (${response.status}). Please try again.`));
         return;
       }
 

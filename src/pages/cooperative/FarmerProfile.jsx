@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff, Pencil, Plus, Send, Trash2 } from 'lucide-react';
 import {
   Avatar, Banner, Breadcrumb, Button, Card, CardHeader, DataTable, EmptyState, InfoList, LinkButton, PageHeader, PageSkeleton, StatusPill, Tabs,
 } from '../../components/ui/index.js';
 import { useApp, useSimulatedLoad } from '../../context/AppContext.jsx';
+import { API_BASE_URL, apiErrorMessage } from '../../utils/api.js';
 import { formatDate, formatDateShort, formatNaira } from '../../utils/format.js';
 import { ReminderModal } from '../../components/coopa/ReminderModal.jsx';
 import { RemoveFarmerModal } from '../../components/coopa/RemoveFarmerModal.jsx';
@@ -32,63 +33,69 @@ function categoryForFarm(farm) {
 export default function FarmerProfile() {
   const { id } = useParams();
   const [sp, setSp] = useSearchParams();
-  const { data } = useApp();
-  const { coop, farmers, farms } = useCoop();
+  const { accessToken, data, add } = useApp();
+  const { coop } = useCoop();
   const loading = useSimulatedLoad(350);
+  const [remoteFarmer, setRemoteFarmer] = useState(null);
+  const [remoteFarms, setRemoteFarms] = useState(null);
+  const [remoteInvestments, setRemoteInvestments] = useState([]);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState('');
   const [showNin, setShowNin] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [reminding, setReminding] = useState(false);
   const [addingFarm, setAddingFarm] = useState(false);
   const tab = TABS.some((t) => t.id === sp.get('tab')) ? sp.get('tab') : 'overview';
-  const farmer = farmers.find((f) => f.id === id);
+  const farmer = remoteFarmer;
+  const farms = remoteFarms || [];
 
-  const rel = useMemo(() => {
-    if (!farmer) return null;
-    const inputs = data.inputRecords.filter((i) => i.farmerId === farmer.id);
-    const obligations = data.obligations.filter((o) => o.farmerId === farmer.id);
-    const payments = data.disbursements.filter((d) => d.recipientType === 'Farmer' && d.recipientId === farmer.id);
-    const loanGroups = new Map();
-    data.disbursements
-      .filter((d) => d.recipientType === 'Farmer' && d.recipientId === farmer.id && d.status === 'Disbursed')
-      .forEach((d) => {
-        const group = loanGroups.get(d.packageId) || [];
-        group.push(d);
-        loanGroups.set(d.packageId, group);
-      });
-    const loans = [...loanGroups.entries()].map(([packageId, entries]) => {
-      const loanObligations = obligations.filter((o) => o.packageId === packageId && o.type === 'Repayment');
-      const dates = entries.map((d) => d.date).filter(Boolean).sort();
-      const dueDates = loanObligations.map((o) => o.dueDate).filter(Boolean).sort();
-      const settled = loanObligations.length > 0 && loanObligations.every((o) => ['Completed', 'Confirmed'].includes(o.status));
-      const overdue = loanObligations.some((o) => o.status === 'Overdue');
-      const pending = loanObligations.some((o) => o.status === 'Pending');
-      const pkgForLoan = data.packages.find((p) => p.id === packageId);
-      const date = dates[0] || '';
-      return {
-        id: `loan-${farmer.id}-${packageId}`,
-        loanId: `LN-${date.slice(2, 4) || '00'}-${`${packageId.replace(/\D/g, '')}${farmer.id.replace(/\D/g, '')}`.padStart(4, '0')}`,
-        amount: entries.reduce((sum, d) => sum + (Number(d.amount) || 0), 0),
-        repaymentAmount: loanObligations.reduce((sum, o) => sum + (Number(o.amount) || 0), 0),
-        repaidAmount: loanObligations.reduce((sum, o) => sum + (Number(o.amountPaid) || (['Completed', 'Confirmed'].includes(o.status) ? Number(o.amount) || 0 : 0)), 0),
-        loanDate: date,
-        dueDate: dueDates[0] || pkgForLoan?.endDate || '',
-        status: settled ? 'Repaid' : overdue ? 'Overdue' : pending ? 'Pending' : 'Active',
-      };
-    }).sort((a, b) => String(b.loanDate).localeCompare(String(a.loanDate)));
-    return { inputs, obligations, payments, loans };
-  }, [farmer, data]);
+  useEffect(() => {
+    const controller = new AbortController();
+    const load = async () => {
+      setProfileLoading(true);
+      if (!accessToken) { setProfileError('Your session has expired. Sign in again to view this farmer.'); setProfileLoading(false); return; }
+      try {
+        const headers = { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' };
+        const [profileResponse, farmsResponse, investmentsResponse] = await Promise.all([
+          fetch(`${API_BASE_URL}/farmers/${encodeURIComponent(id)}`, { headers, signal: controller.signal }),
+          fetch(`${API_BASE_URL}/farmers/${encodeURIComponent(id)}/farms`, { headers, signal: controller.signal }),
+          fetch(`${API_BASE_URL}/farmers/${encodeURIComponent(id)}/investments`, { headers, signal: controller.signal }),
+        ]);
+        const profile = await profileResponse.json().catch(() => null);
+        if (!profileResponse.ok) throw new Error(apiErrorMessage(profile, `Could not load farmer (${profileResponse.status}).`));
+        const farmPayload = await farmsResponse.json().catch(() => []);
+        if (!farmsResponse.ok) throw new Error(apiErrorMessage(farmPayload, `Could not load farms (${farmsResponse.status}).`));
+        const investmentPayload = await investmentsResponse.json().catch(() => []);
+        if (!investmentsResponse.ok) throw new Error(apiErrorMessage(investmentPayload, `Could not load investments (${investmentsResponse.status}).`));
+        const category = profile.farming_category || '';
+        const status = String(profile.verification_status || '').toLowerCase();
+        setRemoteFarmer({ ...profile, id: profile.id || id, name: profile.full_name || [profile.first_name, profile.last_name].filter(Boolean).join(' '), firstName: profile.first_name, lastName: profile.last_name, phone: profile.phone_number || '-', bankName: profile.bank_name || profile.bankName || '', accountNumber: profile.account_number || profile.accountNumber || '', cropType: category, farmingCategory: category, dob: profile.date_of_birth, experienceYears: profile.years_of_experience, dateAdded: profile.date_added || profile.created_at, status: ['verified', 'approved'].includes(status) ? 'Verified' : status === 'removed' ? 'Removed' : status === 'rejected' ? 'Rejected' : 'Pending' });
+        const mappedFarms = (Array.isArray(farmPayload) ? farmPayload : []).map((farm) => ({ ...farm, areaHa: farm.size_in_hectares, farmingCategory: farm.farming_category, status: farm.status === 'ACTIVE' ? 'Active' : 'Inactive', coopId: profile.cooperative_id || coop?.id, farmerId: id }));
+        mappedFarms.forEach((farm) => { if (farm.id && !data.farms.some((existing) => existing.id === farm.id)) add('farms', farm); });
+        setRemoteFarms(mappedFarms);
+        setRemoteInvestments((Array.isArray(investmentPayload) ? investmentPayload : []).map((loan) => ({ ...loan, id: loan.loan_id, loanId: loan.loan_id, amount: Number(loan.loan_amount) || 0, repaymentAmount: Number(loan.repayment_amount) || 0, repaidAmount: 0, loanDate: loan.loan_date || '', dueDate: loan.due_date || '', status: loan.status || 'Pending' })));
+        setProfileError('');
+      } catch (error) { if (error.name !== 'AbortError') setProfileError(error.message || 'Could not load farmer profile.'); }
+      finally { if (!controller.signal.aborted) setProfileLoading(false); }
+    };
+    load();
+    return () => controller.abort();
+  }, [accessToken, id, coop, data.farms, add]);
 
-  if (loading) return <PageSkeleton />;
+  const rel = { inputs: [], obligations: [], payments: [], loans: remoteInvestments };
+
+  if (loading || profileLoading) return <PageSkeleton />;
   if (!coop) return <div className="page"><EmptyState title="We could not find your cooperative record" action={<LinkButton to="/coop" variant="outline">Back to dashboard</LinkButton>}>Sign in again with a cooperative account.</EmptyState></div>;
+  if (profileError && !farmer) return <div className="page"><EmptyState title="Could not load farmer profile" action={<LinkButton to="/coop/farmers" variant="outline">Back to Farmer Directory</LinkButton>}>{profileError}</EmptyState></div>;
   if (!farmer) {
     return <div className="page"><EmptyState title="Farmer not found" action={<LinkButton to="/coop/farmers" variant="outline">Back to Farmer Directory</LinkButton>}>This farmer is not in your cooperative, or the link is out of date.</EmptyState></div>;
   }
 
   const removed = farmer.status === 'Removed';
   const { inputs, obligations, payments, loans } = rel;
-  const totalBorrowed = loans.reduce((sum, loan) => sum + loan.amount, 0);
-  const totalRepaid = loans.reduce((sum, loan) => sum + loan.repaidAmount, 0);
-  const repaymentRate = totalBorrowed ? (totalRepaid / totalBorrowed) * 100 : 0;
+  const totalBorrowed = Number(farmer.performance_summary?.total_amount_borrowed) || loans.reduce((sum, loan) => sum + loan.amount, 0);
+  const totalRepaid = Number(farmer.performance_summary?.total_amount_repaid) || loans.reduce((sum, loan) => sum + loan.repaidAmount, 0);
+  const repaymentRate = Number(farmer.performance_summary?.repayment_rate) || (totalBorrowed ? (totalRepaid / totalBorrowed) * 100 : 0);
 
   return (
     <div className="page coopa">
@@ -267,7 +274,7 @@ export default function FarmerProfile() {
 
       <ReminderModal open={reminding} farmer={farmer} coop={coop} onClose={() => setReminding(false)} />
       <RemoveFarmerModal open={removing} farmer={farmer} onClose={() => { setRemoving(false); }} />
-      <AddFarmModal open={addingFarm} onClose={() => setAddingFarm(false)} coop={coop} farms={farms} onAdded={() => setSp({ tab: 'farms' }, { replace: true })} />
+      <AddFarmModal open={addingFarm} onClose={() => setAddingFarm(false)} farmerId={farmer.id} farms={farms} onAdded={(farm) => { const record = { ...farm, coopId: farmer.cooperative_id || coop?.id, farmerId: farmer.id, status: 'Active' }; setRemoteFarms((current) => [record, ...(current || [])]); if (record.id && !data.farms.some((existing) => existing.id === record.id)) add('farms', record); setSp({ tab: 'farms' }, { replace: true }); }} />
     </div>
   );
 }

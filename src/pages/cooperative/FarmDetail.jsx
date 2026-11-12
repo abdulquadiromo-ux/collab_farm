@@ -4,7 +4,8 @@ import { CalendarCheck, Power, Upload, Users } from 'lucide-react';
 import {
   Avatar, Banner, Breadcrumb, Button, Card, CardHeader, ConfirmDialog, DataTable, EmptyState, InfoList, LinkButton, PageHeader, PageSkeleton, StatusPill,
 } from '../../components/ui/index.js';
-import { useApp, simulate, useSimulatedLoad } from '../../context/AppContext.jsx';
+import { useApp, useSimulatedLoad } from '../../context/AppContext.jsx';
+import { API_BASE_URL, apiErrorMessage } from '../../utils/api.js';
 import { formatDate, formatDateShort } from '../../utils/format.js';
 import { DocLegend, DocStatusPill } from '../../components/coopa/Bits.jsx';
 import { UploadDocumentModal } from '../../components/coopa/UploadDocumentModal.jsx';
@@ -24,7 +25,7 @@ function documentsOf(farm) {
 
 export default function FarmDetail() {
   const { id } = useParams();
-  const { update, notify, toast } = useApp();
+  const { update, notify, toast, accessToken } = useApp();
   const { coop, farmers, farms } = useCoop();
   const loading = useSimulatedLoad(350);
   const [uploading, setUploading] = useState(false);
@@ -55,14 +56,20 @@ export default function FarmDetail() {
 
   const toggleStatus = async () => {
     setBusy(true);
-    await simulate(500);
     const next = active ? 'Inactive' : 'Active';
-    update('farms', farm.id, { status: next }, {
-      action: `Farm marked ${next.toLowerCase()}`, entityType: 'Farm', summary: `${farm.name} status ${farm.status} to ${next}`, reason: active ? 'No longer available for new funding requests' : 'Available for new funding requests again',
-    });
-    toast(`${farm.name} is now ${next.toLowerCase()}.`, 'success');
-    setBusy(false);
-    setToggling(false);
+    try {
+      if (!accessToken) throw new Error('Your session has expired. Sign in again to update the farm.');
+      const response = await fetch(`${API_BASE_URL}/farmers/farms/${encodeURIComponent(farm.id)}/status`, {
+        method: 'PATCH', headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: next.toUpperCase() }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(apiErrorMessage(payload, `Could not update farm status (${response.status}).`));
+      update('farms', farm.id, { status: payload?.status === 'INACTIVE' ? 'Inactive' : 'Active' });
+      toast(`${farm.name} is now ${next.toLowerCase()}.`, 'success');
+      setToggling(false);
+    } catch (error) { toast(error.message || 'Could not update farm status.', 'error'); }
+    finally { setBusy(false); }
   };
 
   const addDocument = (type, file) => {

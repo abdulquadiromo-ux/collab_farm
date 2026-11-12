@@ -1,7 +1,35 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useApp, newId } from '../../context/AppContext.jsx';
 import { formatNaira } from '../../utils/format.js';
 import { todayIso } from './logic.js';
+import { API_BASE_URL, apiErrorMessage } from '../../utils/api.js';
+
+export function useMyProfile() {
+  const { accessToken } = useApp();
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const load = async () => {
+      setLoading(true); setError('');
+      if (!accessToken) { setError('Your session has expired. Sign in again.'); setLoading(false); return; }
+      try {
+        const response = await fetch(`${API_BASE_URL}/onboard/profile/me`, { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' }, signal: controller.signal });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(apiErrorMessage(payload, `Could not load account verification (${response.status}).`));
+        setProfile(payload || null);
+      } catch (cause) { if (cause.name !== 'AbortError') setError(cause.message || 'Could not load account verification.'); }
+      finally { if (!controller.signal.aborted) setLoading(false); }
+    };
+    load();
+    return () => controller.abort();
+  }, [accessToken]);
+
+  const status = String(profile?.verification_status || '').toLowerCase();
+  return { profile, loading, error, verified: status === 'approved' || status === 'verified' };
+}
 
 // The signed in cooperative and its own records. Everything a page shows is scoped to `user.orgId`.
 export function useCoop() {
